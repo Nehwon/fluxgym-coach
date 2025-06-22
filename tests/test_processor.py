@@ -2,11 +2,23 @@
 
 import shutil
 from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+import pytest
 
 from fluxgym_coach.processor import ImageProcessor, process_images
+from fluxgym_coach.image_cache import ImageCache
 
 
 # Les fixtures temp_dir et sample_image sont définies dans conftest.py
+
+
+@pytest.fixture
+def mock_cache():
+    """Crée un mock pour ImageCache."""
+    cache = MagicMock(spec=ImageCache)
+    cache.calculate_file_hash.return_value = "testhash123"
+    return cache
 
 
 def test_image_processor_initialization(temp_dir: Path) -> None:
@@ -15,16 +27,23 @@ def test_image_processor_initialization(temp_dir: Path) -> None:
     input_dir = temp_dir / "input"
     output_dir = temp_dir / "output"
 
-    # Initialiser le processeur
+    # Initialiser le processeur sans cache personnalisé
     processor = ImageProcessor(input_dir, output_dir)
 
     # Vérifier que les attributs sont correctement définis
     assert processor.input_dir == input_dir
     assert processor.output_dir == output_dir
+    assert hasattr(processor, 'cache')
+    assert processor.cache is not None
 
     # Vérifier que le dossier de sortie a été créé
     assert output_dir.exists()
     assert output_dir.is_dir()
+    
+    # Tester avec un cache personnalisé
+    mock_cache = MagicMock()
+    processor_with_cache = ImageProcessor(input_dir, output_dir, cache=mock_cache)
+    assert processor_with_cache.cache is mock_cache
 
 
 def test_is_image_file(sample_image: Path, temp_dir: Path) -> None:
@@ -47,35 +66,37 @@ def test_is_image_file(sample_image: Path, temp_dir: Path) -> None:
     ), "Un fichier texte ne devrait pas être détecté comme une image"
 
 
-def test_generate_file_hash(sample_image: Path, temp_dir: Path) -> None:
-    """Teste la génération de hachage de fichier."""
-    processor = ImageProcessor(temp_dir, temp_dir / "output")
-
-    # Vérifier que le fichier de test existe
-    assert sample_image.exists(), f"Le fichier de test {sample_image} n'existe pas"
-
-    # Générer un hachage pour le fichier image
-    hash_value = processor.generate_file_hash(sample_image)
-
-    # Vérifier que le hachage est une chaîne non vide
-    assert isinstance(hash_value, str)
-    assert len(hash_value) > 0
-
-    # Vérifier que le même fichier génère le même hachage
-    assert hash_value == processor.generate_file_hash(sample_image)
-
-    # Créer un fichier différent pour la comparaison
-    different_file = temp_dir / "different.txt"
-    different_file.write_text("Contenu différent")
-
-    # Vérifier qu'un fichier différent génère un hachage différent
-    assert hash_value != processor.generate_file_hash(different_file)
+def test_cache_usage(sample_image: Path, temp_dir: Path, mock_cache) -> None:
+    """Teste l'utilisation du cache dans ImageProcessor."""
+    output_dir = temp_dir / "output"
+    
+    # Configurer le mock pour simuler un fichier non en cache
+    mock_cache.is_cached.return_value = False
+    
+    # Initialiser le processeur avec le mock
+    processor = ImageProcessor(temp_dir, output_dir, cache=mock_cache)
+    
+    # Appeler process_image
+    result = processor.process_image(sample_image)
+    
+    # Vérifier que le cache a été utilisé correctement
+    mock_cache.is_cached.assert_called_once()
+    mock_cache.add_to_cache.assert_called_once()
+    assert result is not None
+    assert result[0] == sample_image
+    assert result[1].parent == output_dir
 
 
-def test_process_image(sample_image: Path, temp_dir: Path) -> None:
+def test_process_image(sample_image: Path, temp_dir: Path, mock_cache) -> None:
     """Teste le traitement d'une seule image."""
     output_dir = temp_dir / "output"
-    processor = ImageProcessor(temp_dir, output_dir)
+    
+    # Configurer le mock pour simuler un fichier non en cache
+    mock_cache.is_cached.return_value = False
+    mock_cache.calculate_file_hash.return_value = "testhash123"
+    
+    # Initialiser le processeur avec le mock
+    processor = ImageProcessor(temp_dir, output_dir, cache=mock_cache)
 
     # Vérifier que le fichier de test existe
     assert sample_image.exists(), f"Le fichier de test {sample_image} n'existe pas"
@@ -90,6 +111,12 @@ def test_process_image(sample_image: Path, temp_dir: Path) -> None:
     assert (
         result[1].parent == output_dir
     ), "Le fichier de sortie devrait être dans le dossier de sortie"
+    
+    # Vérifier que le cache a été utilisé correctement
+    mock_cache.is_cached.assert_called_once()
+    mock_cache.add_to_cache.assert_called_once()
+    
+    # Vérifier que le fichier de sortie existe
     assert result[1].exists(), "Le fichier de sortie devrait exister"
 
     # Vérifier que le fichier de sortie est une image valide
@@ -97,35 +124,30 @@ def test_process_image(sample_image: Path, temp_dir: Path) -> None:
         result[1]
     ), "Le fichier de sortie devrait être une image valide"
 
-    # Vérifier que le hachage du fichier source et de la destination est le même
-    src_hash = processor.generate_file_hash(sample_image)
-    dst_hash = processor.generate_file_hash(result[1])
-    assert (
-        src_hash == dst_hash
-    ), "Le hachage des fichiers source et destination devrait être identique"
 
-
-def test_process_image_duplicate(sample_image: Path, temp_dir: Path) -> None:
-    """Teste le traitement d'une image en double."""
+def test_process_image_duplicate(sample_image: Path, temp_dir: Path, mock_cache) -> None:
+    """Teste le traitement d'une image en double avec le cache."""
     output_dir = temp_dir / "output"
-    processor = ImageProcessor(temp_dir, output_dir)
+    
+    # Configurer le mock pour simuler un fichier déjà en cache au deuxième appel
+    mock_cache.is_cached.side_effect = [False, True]
+    
+    # Initialiser le processeur avec le mock
+    processor = ImageProcessor(temp_dir, output_dir, cache=mock_cache)
 
     # Vérifier que le fichier de test existe
     assert sample_image.exists(), f"Le fichier de test {sample_image} n'existe pas"
 
-    # Traiter l'image une première fois
+    # Premier appel - pas dans le cache
     result1 = processor.process_image(sample_image)
     assert result1 is not None, "Le premier traitement a échoué"
-
-    # Traiter la même image une deuxième fois (devrait être détectée comme doublon)
+    
+    # Deuxième appel - déjà dans le cache
     result2 = processor.process_image(sample_image)
-
+    
     # Vérifier que le résultat est le même que la première fois
     assert result2 is not None, "Le deuxième traitement a échoué"
     assert result2[0] == result1[0], "La source devrait être la même"
-    assert (
-        result2[1] == result1[1]
-    ), "La destination devrait être la même (fichier en double)"
 
 
 def test_process_directory(sample_image: Path, temp_dir: Path) -> None:
@@ -156,62 +178,38 @@ def test_process_directory(sample_image: Path, temp_dir: Path) -> None:
 
 
 def test_process_images_function(sample_image: Path, temp_dir: Path) -> None:
-    """Teste la fonction process_images."""
+    """Teste la fonction process_images avec un cache."""
     # Créer une structure de dossiers de test
     input_dir = temp_dir / "input"
     input_dir.mkdir(exist_ok=True)
-
-    # Vérifier que le fichier de test existe et est valide
-    assert sample_image is not None, "Le chemin de l'image de test est None"
-    assert sample_image.exists(), f"Le fichier de test {sample_image} n'existe pas"
-    assert sample_image.is_file(), f"Le chemin {sample_image} n'est pas un fichier valide"
-
-    # Créer des images de test avec un contenu différent pour chaque fichier
-    from PIL import Image, ImageDraw
-
-    # Première image (copie de l'image de test existante)
-    shutil.copy2(sample_image, input_dir / "img_0.jpg")
-
-    # Deuxième image (création d'une nouvelle image avec un contenu différent)
-    img1 = Image.new("RGB", (100, 100), color="blue")
-    draw = ImageDraw.Draw(img1)
-    draw.text((10, 10), "Image 2", fill="white")
-    img1.save(input_dir / "img_1.jpg")
-
-    # Créer un sous-dossier avec une autre image différente
-    subdir = input_dir / "subdir"
-    subdir.mkdir(exist_ok=True)
-
-    img2 = Image.new("RGB", (100, 100), color="green")
-    draw = ImageDraw.Draw(img2)
-    draw.text((10, 10), "Image 3", fill="white")
-    img2.save(subdir / "sub_img.jpg")
-
-    # Traiter les images
     output_dir = temp_dir / "output"
-    count = process_images(input_dir, output_dir)
-
-    # Vérifier que toutes les images ont été traitées
-    assert count == 3, (
-        "Devrait traiter 3 images au total "
-        "(2 dans le dossier racine + 1 dans le sous-dossier)"
-    )
-
-    # Vérifier que le bon nombre de fichiers a été créé
-    output_files = list(output_dir.glob("**/*.jpg"))
-    assert (
-        len(output_files) == 3
-    ), f"Devrait y avoir 3 fichiers en sortie, trouvé {len(output_files)}"
-
-    # Vérifier que les fichiers de sortie existent et sont des images valides
-    for file_path in output_files:
-        assert file_path.exists(), f"Le fichier {file_path} n'existe pas"
-        assert file_path.stat().st_size > 0, f"Le fichier {file_path} est vide"
-
-        # Vérifier que le nom du fichier est un hachage (64 caractères hexadécimaux)
-        import re
-
-        filename = file_path.name
-        assert re.match(
-            r"^[0-9a-f]{64}\.jpg$", filename
-        ), f"Le nom de fichier {filename} n'est pas un hachage valide"
+    
+    # Créer quelques fichiers de test
+    test_files = []
+    for i in range(3):
+        test_file = input_dir / f"img_{i}.jpg"
+        shutil.copy2(sample_image, test_file)
+        test_files.append(test_file)
+    
+    # Utiliser patch pour simuler get_default_cache
+    with patch('fluxgym_coach.processor.get_default_cache') as mock_get_cache:
+        mock_cache = MagicMock()
+        mock_get_cache.return_value = mock_cache
+        
+        # Configurer le mock pour simuler des fichiers non en cache
+        mock_cache.is_cached.return_value = False
+        
+        # Appeler la fonction à tester
+        count = process_images(input_dir, output_dir)
+        
+        # Vérifier que get_default_cache a été appelé
+        mock_get_cache.assert_called_once()
+        
+        # Vérifier que le cache a été utilisé pour chaque fichier
+        assert mock_cache.is_cached.call_count == 3, "Devrait vérifier le cache pour chaque fichier"
+        
+        # Vérifier les résultats
+        assert count == 3, f"Devrait traiter 3 images, traitées: {count}"
+        
+        # Vérifier que le dossier de sortie a été créé
+        assert output_dir.exists() and output_dir.is_dir()

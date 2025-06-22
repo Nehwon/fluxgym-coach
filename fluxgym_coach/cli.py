@@ -4,9 +4,10 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Any
 
 from . import __version__
+from .image_cache import ImageCache, get_default_cache
 from .description import process_descriptions
 from .image_enhancement import ImageEnhancer
 
@@ -51,6 +52,30 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         help="Type de traitement à effectuer (défaut: all)",
     )
     
+    # Options pour le cache
+    cache_group = parser.add_argument_group("Options de cache")
+    cache_group.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Désactive complètement l'utilisation du cache"
+    )
+    cache_group.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Force le retraitement de toutes les images, même si elles sont en cache"
+    )
+    cache_group.add_argument(
+        "--cache-dir",
+        type=str,
+        default=None,
+        help="Dossier personnalisé pour stocker le cache (par défaut: .fluxgym_cache dans le dossier utilisateur)"
+    )
+    cache_group.add_argument(
+        "--clean-cache",
+        action="store_true",
+        help="Nettoie le cache des entrées obsolètes avant le traitement"
+    )
+
     # Options pour l'amélioration d'image
     enhance_group = parser.add_argument_group("Options d'amélioration d'image")
     enhance_group.add_argument(
@@ -149,6 +174,40 @@ def find_image_files(directory: Path) -> List[Path]:
     return image_files
 
 
+def setup_cache(args: argparse.Namespace) -> Optional[ImageCache]:
+    """Configure et retourne une instance de cache selon les arguments.
+    
+    Args:
+        args: Arguments de la ligne de commande
+        
+    Returns:
+        Instance de ImageCache ou None si le cache est désactivé
+    """
+    if args.no_cache:
+        logger.info("Cache désactivé (--no-cache)")
+        return None
+        
+    cache_dir = args.cache_dir
+    if cache_dir:
+        cache_dir = Path(cache_dir).expanduser().absolute()
+        logger.debug(f"Utilisation du dossier de cache personnalisé: {cache_dir}")
+    
+    try:
+        cache = get_default_cache(cache_dir=cache_dir)
+        
+        if args.clean_cache:
+            logger.info("Nettoyage du cache...")
+            cache.clean_old_entries()
+            
+        if args.force_reprocess:
+            logger.info("Mode force-reprocess activé, le cache sera ignoré")
+            
+        return cache
+    except Exception as e:
+        logger.warning(f"Impossible d'initialiser le cache: {e}")
+        return None
+
+
 def main(args: Optional[Sequence[str]] = None) -> int:
     """Point d'entrée principal du programme.
 
@@ -197,6 +256,12 @@ def main(args: Optional[Sequence[str]] = None) -> int:
         logger.info(f"Source: {input_dir}")
         logger.info(f"Destination: {output_dir}")
         logger.info(f"Type de traitement: {parsed_args.process}")
+        
+        # Configurer le cache
+        cache = setup_cache(parsed_args)
+        cache_params = {
+            'force_reprocess': parsed_args.force_reprocess
+        }
 
         # Trouver les fichiers image dans le dossier d'entrée
         image_files = find_image_files(input_dir)
@@ -218,9 +283,21 @@ def main(args: Optional[Sequence[str]] = None) -> int:
 
         # Traitement des images (renommage et traitement complet)
         if parsed_args.process in ["all", "rename"]:
-            from fluxgym_coach.processor import process_images
-
-            processed_count = process_images(input_dir, output_dir)
+            from fluxgym_coach.processor import ImageProcessor
+            
+            # Créer une instance de ImageProcessor avec le cache configuré
+            processor = ImageProcessor(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                cache=cache,
+                cache_params=cache_params if cache else None
+            )
+            
+            # Traiter les images
+            processed_count = 0
+            for _ in processor.process_directory():
+                processed_count += 1
+                
             action = "renommées et traitées" if parsed_args.process == "all" else "renommées"
             logger.info(
                 f"Traitement des images terminé. "

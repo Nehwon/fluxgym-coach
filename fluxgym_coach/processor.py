@@ -1,10 +1,11 @@
 """Module de traitement des images pour Fluxgym-coach."""
 
-import hashlib
 import logging
 from pathlib import Path
-from typing import Iterator, Tuple, Optional
+from typing import Iterator, Optional, Tuple, Dict, Any
 from PIL import Image, UnidentifiedImageError
+
+from .image_cache import ImageCache, get_default_cache
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -16,18 +17,33 @@ class ImageProcessor:
     # Extensions d'images supportées
     SUPPORTED_EXTENSIONS = {"jpeg", "jpg", "png", "gif", "bmp", "tiff", "webp"}
 
-    def __init__(self, input_dir: Path, output_dir: Path):
+    def __init__(
+        self,
+        input_dir: Path,
+        output_dir: Path,
+        cache: Optional[ImageCache] = None,
+        cache_params: Optional[Dict[str, Any]] = None
+    ):
         """Initialise le processeur d'images.
 
         Args:
             input_dir: Dossier source contenant les images
             output_dir: Dossier de destination pour les images traitées
+            cache: Instance de ImageCache à utiliser (optionnel)
+            cache_params: Paramètres pour initialiser un nouveau cache si aucun n'est fourni (optionnel)
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
+        
+        # Initialiser le cache
+        self.cache = cache or get_default_cache()
+        if cache_params and not cache:
+            self.cache = ImageCache(**cache_params)
 
         # Créer le dossier de sortie s'il n'existe pas
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.debug(f"ImageProcessor initialisé avec le cache: {self.cache}")
 
     def is_image_file(self, file_path: Path) -> bool:
         """Vérifie si un fichier est une image valide.
@@ -53,27 +69,6 @@ class ImageProcessor:
         except (IOError, OSError, UnidentifiedImageError):
             return False
 
-    def generate_file_hash(
-        self, file_path: Path, hash_algorithm: str = "sha256"
-    ) -> str:
-        """Génère un hachage pour un fichier.
-
-        Args:
-            file_path: Chemin du fichier à hacher
-            hash_algorithm: Algorithme de hachage à utiliser (par défaut: sha256)
-
-        Returns:
-            Chaîne de caractères représentant le hachage du fichier
-        """
-        hasher = hashlib.new(hash_algorithm)
-
-        with open(file_path, "rb") as f:
-            # Lire le fichier par blocs pour gérer les gros fichiers
-            for chunk in iter(lambda: f.read(4096), b""):
-                hasher.update(chunk)
-
-        return hasher.hexdigest()
-
     def get_new_filename(self, file_path: Path, hash_value: str) -> Path:
         """Génère un nouveau nom de fichier basé sur le hachage.
 
@@ -89,11 +84,16 @@ class ImageProcessor:
         new_filename = f"{hash_value}{ext}"
         return self.output_dir / new_filename
 
-    def process_image(self, file_path: Path) -> Optional[Tuple[Path, Path]]:
+    def process_image(
+        self, 
+        file_path: Path,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Optional[Tuple[Path, Path]]:
         """Traite une image unique.
 
         Args:
             file_path: Chemin du fichier image à traiter
+            params: Paramètres de traitement optionnels pour le cache
 
         Returns:
             Tuple[Path, Path] | None: Un tuple (chemin_original, nouveau_chemin) si le
@@ -104,27 +104,34 @@ class ImageProcessor:
             return None
 
         try:
-            # Générer un hachage pour le fichier
-            file_hash = self.generate_file_hash(file_path)
-
-            # Créer un nouveau nom de fichier basé sur le hachage
-            new_path = self.get_new_filename(file_path, file_hash)
-
-            # Vérifier si le fichier existe déjà dans la destination
-            if new_path.exists():
-                logger.debug(f"Le fichier existe déjà: {new_path}")
+            # Vérifier si l'image est déjà dans le cache
+            new_path = self.output_dir / f"{file_path.stem}{file_path.suffix}"
+            
+            if self.cache.is_cached(file_path, output_path=new_path, params=params):
+                logger.debug(f"Image déjà dans le cache: {file_path}")
                 return (file_path, new_path)
+
+            # Créer un nouveau nom de fichier basé sur le hachage du fichier
+            # via le cache pour éviter les doublons
+            file_hash = self.cache.calculate_file_hash(file_path)
+            new_path = self.get_new_filename(file_path, file_hash)
 
             # Copier le fichier vers le nouveau chemin
             import shutil
-
             shutil.copy2(file_path, new_path)
+            
+            # Ajouter au cache
+            self.cache.add_to_cache(
+                source_path=file_path,
+                output_path=new_path,
+                params=params
+            )
+            
             logger.info(f"Image traitée: {file_path.name} -> {new_path.name}")
-
             return (file_path, new_path)
 
         except Exception as e:
-            logger.error(f"Erreur lors du traitement de {file_path}: {str(e)}")
+            logger.error(f"Erreur lors du traitement de {file_path}: {str(e)}", exc_info=True)
             return None
 
     def process_directory(self) -> Iterator[Tuple[Path, Optional[Path]]]:
