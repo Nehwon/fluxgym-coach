@@ -1,0 +1,139 @@
+# Changelog
+
+Tous les changements notables de ce projet seront documentés dans ce fichier.
+
+Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
+et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Non publié] - 2025-06-22
+
+### Ajouté
+- **Système de cache** :
+  - Nouvelle classe `ImageCache` pour gérer la mise en cache des images traitées
+  - Intégration du cache dans la méthode `upscale_batch`
+  - Vérification des empreintes de fichiers pour détecter les modifications
+  - Options de ligne de commande pour contrôler le cache (`--no-cache`, `--force-reprocess`, `--cache-dir`)
+  - Support du cache pour éviter le retraitement des images inchangées
+  - Gestion des paramètres de traitement dans la clé de cache
+  - Utilisation de `xxhash` pour le calcul rapide des empreintes de fichiers
+
+### Ajouté
+- **Traitement par lots** :
+  - Nouvelle méthode `upscale_batch` pour traiter plusieurs images en une seule requête
+  - Support des motifs glob pour la sélection des fichiers
+  - Gestion des erreurs granulaire (une image en échec ne bloque pas le traitement des autres)
+  - Affichage détaillé de la progression
+  - Option pour désactiver la colorisation automatique
+  - Taille de lot configurable
+
+- **Colorisation automatique** :
+  - Détection intelligente des images en noir et blanc
+  - Colorisation automatique via l'API Stable Diffusion
+  - Paramètres personnalisables pour la colorisation
+  - Gestion des échecs de colorisation avec repli sur le mode N/B
+
+- **Tests unitaires** :
+  - Couverture complète du module `image_enhancement.py` (100%)
+  - Tests pour la méthode `upscale_batch`
+  - Tests pour la gestion des erreurs dans le traitement par lots
+  - Fixtures pour les tests d'images
+  - Mocks pour les appels API avec `requests`
+  - Tests de gestion des erreurs d'API
+  - Tests pour la détection des images en noir et blanc
+  - Tests pour le prétraitement des images avec canal alpha
+  - Tests pour la gestion des formats non supportés
+  - Tests pour la validation des paramètres
+
+- **Configuration** :
+  - Mise en place de mypy pour la vérification de types
+  - Configuration de pytest pour la couverture de code
+  - Intégration avec les outils de qualité de code
+
+- **Améliorations** :
+  - Meilleure gestion de la mémoire lors du traitement par lots
+  - Conversion forcée en PNG pour les images de sortie
+  - Détection améliorée des images en noir et blanc
+  - Documentation mise à jour avec les nouvelles fonctionnalités
+  - Interface en ligne de commande améliorée avec plus d'options
+
+### Modifié
+- **Refactoring** :
+  - Correction des erreurs de typage signalées par mypy
+  - Amélioration de la structure du code
+  - Optimisation des imports
+  - Mise à jour des dépendances
+
+- **Documentation** :
+  - Mise à jour du README avec les instructions de test
+  - Ajout d'exemples d'utilisation
+  - Documentation des nouvelles fonctionnalités
+
+### Corrigé
+- **Bugs** :
+  - Correction des fuites de mémoire dans le traitement par lots
+  - Résolution du problème de redimensionnement non proportionnel
+
+## [Non publié] - 2025-06-21
+
+### Ajouté
+- Intégration de Stable Diffusion Forge pour l'amélioration d'images
+  - Support de l'upscaling avec différents facteurs d'échelle
+  - Détection automatique des images en noir et blanc
+  - Conversion automatique des formats d'image (WebP, JPG, PNG, etc.)
+  - Redimensionnement intelligent avec conservation des proportions
+- Nouveau module `image_enhancement.py` pour gérer l'amélioration d'images
+- Documentation complète pour l'API d'amélioration d'images
+- Tests unitaires pour les nouvelles fonctionnalités
+
+### Corrigé
+- **Bugs** :
+  - Correction des fuites de mémoire dans le traitement par lots
+  - Résolution du problème de redimensionnement non proportionnel
+  - Correction de la gestion des erreurs lors de l'appel à l'API
+  - Problème de format de sortie non respecté
+
+- **Sécurité** :
+  - Mise à jour des dépendances vulnérables
+  - Renforcement de la validation des entrées
+  - Amélioration de la gestion des erreurs
+
+- **Performances** :
+  - Optimisation de l'utilisation de la mémoire
+  - Réduction du temps d'exécution des tests
+  - Amélioration de la réactivité de l'interface
+
+### Supprimé
+- Code obsolète et non utilisé
+- Fichiers de configuration redondants
+- Anciennes versions des dépendances
+- Correction des erreurs de style dans les tests
+- Amélioration de la gestion des erreurs et des messages de log
+- Mise à jour des dépendances dans `requirements.txt`
+- Correction des problèmes de compatibilité avec Python 3.13
+
+## [0.2.0] - 2025-06-20
+
+### Modifié
+- Refactorisation du module `metadata.py` pour utiliser un hachage de contenu pour nommer les fichiers de métadonnées
+- Amélioration de la déduplication des métadonnées pour les images identiques
+- Mise à jour des tests pour refléter les changements de comportement
+- Création de la branche `feature/fluxgym-coach` pour le développement
+
+## [0.1.0] - 2025-06-20
+
+### Ajouté
+- Structure initiale du projet
+- Module de traitement d'images avec renommage par hachage
+- Module d'extraction de métadonnées EXIF et de base
+- Interface en ligne de commande (CLI) de base
+- Système de configuration
+- Utilitaires de validation
+- Documentation de base
+
+### Modifié
+- Initialisation du projet
+
+### Supprimé
+- Aucune suppression pour le moment
+
+[0.1.0]: https://gitea.lamachere.fr/fabrice/docker/tree/feature/fluxgym-coach
