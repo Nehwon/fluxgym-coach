@@ -1,128 +1,74 @@
-# Plan de développement : Fluxgym-coach
+# Plan
 
 ## Notes
-- Le projet `Fluxgym-coach` est un assistant pour la préparation de datasets d'images pour l'outil Fluxgym.
-- Le développement doit suivre les directives définies dans `PROTOCOLE_RACINE.md`.
-- La version actuelle est 0.4.0 en développement.
-- La méthode `colorize_image` a été ajoutée et `upscale_image` a été modifiée pour gérer la recoloration automatique des images N&B.
-- La logique de la variable `is_bw` a été corrigée dans `upscale_image`.
-- Tous les tests pour `image_enhancement.py` passent maintenant.
-- Le mock de la méthode `_call_api` a finalement réussi en remplaçant directement la méthode sur l'instance de l'objet (`monkey patching`).
-- L'analyse du code montre que `upscale_image` traite les images une par une. L'optimisation passe par l'implémentation d'une méthode de traitement par lots (`batch processing`).
-- L'analyse de l'API Stable Diffusion WebUI suggère que le traitement par lots pour l'upscaling d'images doit passer par l'endpoint `/sdapi/v1/extra-batch-images`.
-- La méthode `upscale_batch` a été implémentée pour traiter plusieurs images en une seule requête API.
-- La fonction utilitaire `enhance_image` a été mise à jour pour gérer à la fois le traitement d'une seule image et le traitement par lots.
-- Les tests unitaires pour `upscale_batch` ont été ajoutés et tous les tests passent.
-- L'interface en ligne de commande a été mise à jour pour gérer le traitement par lots, y compris la gestion des motifs glob pour les chemins de fichiers.
-- La documentation du projet a été entièrement mise à jour pour refléter les fonctionnalités de traitement par lots.
-- Une classe `ImageCache` a été créée dans `fluxgym_coach/image_cache.py` pour gérer la mise en cache des images traitées.
-- La dépendance `xxhash` a été ajoutée pour le calcul rapide des empreintes de fichiers.
-- La logique de cache a été intégrée avec succès dans la méthode `upscale_batch`.
+- Le dépôt distant est `ssh://git@gitea.lamachere.fr:2222/fabrice/Fluxgym-coach.git`.
+- La branche `main` a été corrigée en utilisant la branche `master` comme base, et a été forcée sur le dépôt distant.
+- Le fichier `.gitignore` a été mis à jour pour exclure les fichiers compilés Python.
+- Le travail reprend sur la base des fichiers `TODO.md` et `PROJET.md`.
+- Le projet est maintenant nettoyé et prêt pour le développement.
+- Les tests unitaires pour `ImageCache` ont été créés et passent avec succès.
+- `ImageProcessor` a été mis à jour pour utiliser `ImageCache`.
+- Les tests pour `ImageProcessor` ont été mis à jour et passent avec succès.
+- Le test `test_main_success` dans `tests/test_cli.py` a été corrigé avec succès en ajustant les mocks.
+- Les tests pour `setup_cache` ont été créés dans un fichier séparé (`tests/test_setup_cache.py`) et passent avec succès, après des difficultés à modifier `test_cli.py` directement.
+- Les tests `test_main_verbose` et `test_main_processing_error` ont été recréés dans un nouveau fichier (`tests/test_cli_extra.py`) et passent avec succès.
 
-## Fonctionnalités actuelles
-- Amélioration de la qualité des images avec Stable Diffusion Forge
-- Traitement par lots des images
-- Cache pour éviter le retraitement des images inchangées
-- Colorisation automatique des images en noir et blanc
-- Interface en ligne de commande conviviale
+## Règles à respecter
+- Tous les développements doivent respecter les règles définies dans `PROTOCOLE_RACINE.md`
+- Les messages de commit doivent suivre la convention [Conventional Commits](https://www.conventionalcommits.org/)
+- Les Pull Requests doivent être revues par au moins un autre développeur
+- La couverture de code doit être maintenue au-dessus de 80%
 
-## Prochaines étapes
-1. Ajouter les options de ligne de commande pour contrôler le cache
-2. Écrire des tests unitaires pour la méthode `upscale_batch` avec cache
-3. Mettre à jour la documentation de la méthode `upscale_batch`
-4. Tester les performances avec et sans cache
-5. Créer une interface utilisateur graphique
-6. Dockeriser l'application
-7. Intégrer avec Fluxgym
+## Task List
+- [x] Configurer le dépôt distant.
+- [x] Récupérer les données du dépôt distant.
+- [x] Basculer sur la branche `main`.
+- [x] Vérifier la présence du fichier `LICENSE`.
+- [x] Ajouter tous les fichiers non suivis à l'index.
+- [x] Créer un commit pour les nouveaux fichiers.
+- [x] Pousser le commit vers le dépôt distant.
+- [x] Valider que tous les fichiers locaux sont présents sur le dépôt distant.
+- [x] Investiguer la disparition des fichiers source `.py`.
+- [x] Restaurer les fichiers source depuis le dépôt Git (trouvés sur la branche `master`).
+- [x] Réinitialiser la branche `main` pour qu'elle corresponde à l'état de la branche `master`.
+- [x] Forcer le push de la branche `main` corrigée vers le dépôt distant (`git push --force`).
+- [x] Mettre à jour le fichier `.gitignore` pour ignorer les fichiers `.pyc` et les répertoires `__pycache__`.
+- [x] Nettoyer les fichiers inutiles (comme les `.pyc`) de l'index Git.
+- [x] Créer un commit pour la mise à jour du `.gitignore` et le nettoyage de l'index.
+- [x] Pousser les modifications du `.gitignore` vers le dépôt distant.
+- [x] Créer le fichier de test `tests/test_image_cache.py`.
+- [x] Écrire les tests unitaires pour la classe `ImageCache`.
+  - [x] Tester le calcul de hash (`calculate_file_hash`).
+  - [x] Tester la génération de clé de cache (`get_cache_key`).
+  - [x] Tester l'ajout et la vérification d'entrées dans le cache (`add_to_cache`, `is_cached`).
+  - [x] Tester la persistance du cache sur disque (`_load_cache`, `_save_cache`).
+- [x] Intégrer `ImageCache` dans `ImageProcessor`.
+  - [x] Modifier `ImageProcessor.__init__` pour accepter une instance de `ImageCache`.
+  - [x] Mettre à jour `process_image` pour utiliser `ImageCache`.
+  - [x] Supprimer la méthode `generate_file_hash` de `ImageProcessor` car elle est redondante.
+- [x] Mettre à jour les tests dans `test_processor.py` pour refléter l'utilisation de `ImageCache`.
+- [x] Corriger les tests qui échouent dans `test_processor.py`.
+  - [x] Corriger `test_process_image` pour ne plus utiliser `generate_file_hash`.
+  - [x] Corriger l'assertion dans `test_process_images_function`.
+- [x] Ajouter les options de ligne de commande pour contrôler le cache.
+- [x] Utiliser le cache configuré dans le traitement des images (`cli.py`).
+- [x] Mettre à jour les tests pour `cli.py` pour couvrir les options de cache.
+  - [x] Mettre à jour les imports dans `test_cli.py`.
+  - [x] Mettre à jour `test_parse_args` pour inclure les options de cache.
+  - [x] Corriger le test `test_main_success`.
+    - [x] Aligner les décorateurs `@patch` avec les arguments de la fonction.
+    - [x] Corriger le chemin du patch pour `get_default_cache` (doit être `fluxgym_coach.cli.get_default_cache`).
+    - [x] S'assurer que le test passe et que les assertions sont correctes.
+  - [x] Ajouter des tests pour la fonction `setup_cache`.
+    - [x] Tester la désactivation du cache (`--no-cache`).
+    - [x] Tester le répertoire de cache personnalisé.
+    - [x] Tester le nettoyage du cache (`--clean-cache`).
+    - [x] Tester le mode forcé (`--force-reprocess`).
+    - [x] Tester la gestion des erreurs d'initialisation.
+  - [x] Recréer `test_main_verbose` avec les mocks appropriés.
+  - [x] Recréer `test_main_processing_error` avec les mocks appropriés.
+- [x] Mettre à jour la documentation pour les fonctionnalités de cache.
+- [ ] Tester les performances avec et sans le cache.
 
-## Structure du projet
-```
-fluxgym-coach/
-├── fluxgym_coach/
-│   ├── __init__.py
-│   ├── image_enhancement.py
-│   ├── image_cache.py
-│   └── __main__.py
-├── tests/
-│   ├── __init__.py
-│   ├── test_image_enhancement.py
-│   └── test_image_cache.py
-├── docs/
-│   ├── CHANGELOG.md
-│   ├── ETAT_DU_PROJET.md
-│   ├── PROJET.md
-│   ├── PROTOCOLE.md
-│   └── TODO.md
-├── examples/
-├── README.md
-└── pyproject.toml
-```
-
-## Dépendances
-- Python 3.8+
-- Pillow
-- requests
-- xxhash
-- black (pour le formatage)
-- pytest (pour les tests)
-
-## Installation
-```bash
-pip install -e .
-```
-
-## Utilisation
-```bash
-python -m fluxgym_coach image1.jpg image2.jpg --output output_dir --scale 2
-```
-
-## Options de ligne de commande
-```
-usage: python -m fluxgym_coach [-h] [--output OUTPUT] [--api-url API_URL] [--scale {1,2,3,4}]
-                              [--upscaler UPSCALER] [--denoising-strength DENOISING_STRENGTH]
-                              [--prompt PROMPT] [--negative-prompt NEGATIVE_PROMPT]
-                              [--steps STEPS] [--cfg-scale CFG_SCALE] [--sampler SAMPLER]
-                              [--format {PNG,JPEG,JPG,WEBP}] [--no-colorize]
-                              [--colorize-prompt COLORIZE_PROMPT]
-                              [--colorize-negative-prompt COLORIZE_NEGATIVE_PROMPT] [--no-cache]
-                              [--force-reprocess] [--cache-dir CACHE_DIR] [--force] [-v]
-                              image_paths [image_paths ...]
-
-positional arguments:
-  image_paths           Chemin(s) vers l'image ou les images à améliorer. Peut être un fichier
-                        unique, une liste de fichiers, ou un motif glob (ex: 'images/*.jpg')
-
-options:
-  -h, --help            show this help message and exit
-  --output OUTPUT, -o OUTPUT
-                        Chemin de sortie (fichier pour une image, répertoire pour plusieurs
-                        images, par défaut: <nom_original>_enhanced.<format>)
-  --api-url API_URL     URL de l'API Stable Diffusion Forge (défaut: http://127.0.0.1:7860)
-  --scale {1,2,3,4}     Facteur d'échelle (1-4, défaut: 2)
-  --upscaler UPSCALER   Nom de l'upscaler à utiliser (défaut: R-ESRGAN 4x+ Anime6B)
-  --denoising-strength DENOISING_STRENGTH
-                        Force du débruiteur (0-1, défaut: 0.5)
-  --prompt PROMPT       Prompt pour guider l'amélioration
-  --negative-prompt NEGATIVE_PROMPT
-                        Éléments à éviter dans l'image
-  --steps STEPS         Nombre d'étapes de débruiteur
-  --cfg-scale CFG_SCALE
-                        Échelle de configuration du classificateur
-  --sampler SAMPLER     Nom de l'échantillonneur à utiliser
-  --format {PNG,JPEG,JPG,WEBP}
-                        Format de sortie (défaut: PNG)
-  --no-colorize        Désactive la colorisation automatique des images N/B
-  --colorize-prompt COLORIZE_PROMPT
-                        Prompt personnalisé pour la colorisation
-  --colorize-negative-prompt COLORIZE_NEGATIVE_PROMPT
-                        Prompt négatif personnalisé pour la colorisation
-  --no-cache            Désactive complètement le cache
-  --force-reprocess     Force le retraitement même si l'image est en cache
-  --cache-dir CACHE_DIR
-                        Définit un répertoire personnalisé pour le cache
-  --force               Force le retraitement même si le fichier de sortie existe déjà
-  -v, --verbose         Active les logs détaillés
-```
-
-## Licence
-MIT
+## Current Goal
+Tester les performances du cache.
