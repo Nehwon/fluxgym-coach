@@ -3,30 +3,46 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Tests](https://img.shields.io/badge/tests-100%25-success)](https://github.com/psf/black)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/yourusername/fluxgym-coach/releases/tag/v0.1.0)
 
 Assistant de préparation de datasets d'images pour Fluxgym
 
 ## 📋 Description
 
-Fluxgym-coach est un outil conçu pour faciliter la préparation et l'optimisation des ensembles de données d'images pour Fluxgym. Il automatise les tâches courantes telles que le renommage des fichiers, l'extraction des métadonnées et la gestion des doublons basée sur le contenu.
+Fluxgym-coach est un outil puissant conçu pour faciliter la préparation et l'optimisation des ensembles de données d'images pour Fluxgym. Il automatise les tâches courantes de traitement d'images, offrant des fonctionnalités avancées d'amélioration, de gestion de cache et de traitement par lots.
+
+Avec son système de cache intelligent, Fluxgym-coach optimise les performances en évitant les retraitements inutiles, tout en offrant une grande flexibilité grâce à son interface en ligne de commande complète.
 
 ## ✨ Fonctionnalités clés
 
-- **Amélioration d'images** : Utilisation de Stable Diffusion Forge pour améliorer la qualité et la résolution
-  - **Traitement par lots** : Traitement efficace de plusieurs images en une seule opération
-  - **Système de cache intelligent** : Évite le retraitement inutile des images inchangées
-    - Vérification des empreintes de fichiers (hash MD5)
-    - Prise en compte des paramètres de traitement
-    - Désactivable via ligne de commande (`--no-cache`)
-    - Forçage du retraitement (`--force-reprocess`)
-    - Nettoyage du cache (`--clean-cache`)
-    - Personnalisation du répertoire de cache (`--cache-dir`)
-  - **Upscaling intelligent** : Augmentation de la résolution jusqu'à 4x
-  - **Colorisation automatique** : Détection et colorisation automatique des images en noir et blanc
-  - **Détection automatique N&B** : Identification des images en noir et blanc pour un traitement adapté
-  - **Conversion de format** : Support de tous les formats courants (PNG, JPG, WebP, etc.)
-  - **Redimensionnement proportionnel** : Conservation des proportions avec largeur minimale configurable (1024px par défaut)
-  - **Gestion mémoire optimisée** : Traitement efficace des lots d'images avec nettoyage automatique des ressources
+### 🚀 Amélioration d'images
+- **Traitement par lots** : Traitement efficace de plusieurs images en une seule opération
+- **Upscaling intelligent** : Augmentation de la résolution jusqu'à 4x
+- **Colorisation automatique** : Détection et colorisation des images en noir et blanc
+- **Détection automatique N&B** : Identification intelligente des images en niveaux de gris
+- **Conversion de format** : Support des formats PNG, JPG, WebP et plus
+- **Redimensionnement proportionnel** : Conservation des rapports d'aspect
+
+### ⚡ Optimisation des performances
+- **Système de cache intelligent** : Évite le retraitement inutile
+  - Vérification des empreintes de fichiers avec `xxhash`
+  - Prise en compte des paramètres de traitement dans la clé de cache
+  - Nettoyage automatique des entrées invalides
+  - Cache persistant sur le disque entre les sessions
+  - Statistiques d'utilisation du cache
+
+### 🛠️ Options de ligne de commande
+- `--no-cache` : Désactive complètement le cache
+- `--force-reprocess` : Force le retraitement de toutes les images
+- `--cache-dir` : Spécifie un répertoire personnalisé pour le cache
+- `--clean-cache` : Nettoie le cache avant l'exécution
+- `--verbose` : Active les journaux détaillés
+
+### 📊 Outils de développement
+- Script de benchmark intégré pour mesurer les performances
+- Génération d'images de test pour les benchmarks
+- Statistiques détaillées (moyenne, min, max, écart-type)
 
 - **Tests unitaires complets**
   - Couverture de test pour le module d'amélioration d'images
@@ -40,10 +56,25 @@ Fluxgym-coach est un outil conçu pour faciliter la préparation et l'optimisati
 
 ## 📦 Prérequis
 
+### Système
 - Python 3.8 ou supérieur
 - pip (gestionnaire de paquets Python)
 - Git (pour le clonage du dépôt)
-- Stable Diffusion WebUI Forge (pour l'amélioration d'images)
+
+### Dépendances principales
+- `Pillow` : Traitement d'images
+- `numpy` : Calculs numériques
+- `requests` : Requêtes HTTP
+- `python-multipart` : Téléchargement de fichiers
+- `xxhash` : Calcul rapide d'empreintes
+
+### Pour le développement
+- `pytest` : Exécution des tests
+- `black` : Formatage du code
+- `mypy` : Vérification de types
+- `pytest-cov` : Couverture des tests
+
+> **Note** : Pour l'amélioration d'images, un serveur Stable Diffusion WebUI Forge est requis.
 
 ## 🧪 Exécution des tests
 
