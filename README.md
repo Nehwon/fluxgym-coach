@@ -15,9 +15,12 @@ Fluxgym-coach est un outil conçu pour faciliter la préparation et l'optimisati
 - **Amélioration d'images** : Utilisation de Stable Diffusion Forge pour améliorer la qualité et la résolution
   - **Traitement par lots** : Traitement efficace de plusieurs images en une seule opération
   - **Système de cache intelligent** : Évite le retraitement inutile des images inchangées
-    - Vérification des empreintes de fichiers
+    - Vérification des empreintes de fichiers (hash MD5)
     - Prise en compte des paramètres de traitement
-    - Désactivable via ligne de commande
+    - Désactivable via ligne de commande (`--no-cache`)
+    - Forçage du retraitement (`--force-reprocess`)
+    - Nettoyage du cache (`--clean-cache`)
+    - Personnalisation du répertoire de cache (`--cache-dir`)
   - **Upscaling intelligent** : Augmentation de la résolution jusqu'à 4x
   - **Colorisation automatique** : Détection et colorisation automatique des images en noir et blanc
   - **Détection automatique N&B** : Identification des images en noir et blanc pour un traitement adapté
@@ -135,6 +138,15 @@ fluxgym-coach -i chemin/vers/le/dossier/source -o chemin/vers/le/dossier/destina
 fluxgym-coach -i source -o destination -p enhance --scale-factor 2
 ```
 
+### Options de cache
+
+Le système de cache peut être contrôlé via les options suivantes :
+
+- `--no-cache` : Désactive complètement le cache
+- `--force-reprocess` : Force le retraitement de toutes les images, même si elles sont en cache
+- `--cache-dir CHEMIN` : Spécifie un répertoire personnalisé pour le cache
+- `--clean-cache` : Nettoie les entrées obsolètes du cache avant le traitement
+
 ### Options d'amélioration d'images
 ```bash
 python -m fluxgym_coach.image_enhancement chemin/vers/image.jpg --output chemin/de/sortie.jpg
@@ -157,11 +169,17 @@ python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --batch-size 10
 # Désactiver le cache (forcer le retraitement)
 python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --no-cache --output dossier/sortie/
 
-# Forcer le retraitement d'images spécifiques
+# Forcer le retraitement de toutes les images, même en cache
 python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --force-reprocess --output dossier/sortie/
 
 # Spécifier un répertoire personnalisé pour le cache
 python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --cache-dir /chemin/vers/cache --output dossier/sortie/
+
+# Nettoyer le cache avant le traitement
+python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --clean-cache --output dossier/sortie/
+
+# Combiner plusieurs options de cache
+python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --cache-dir /chemin/vers/cache --clean-cache --output dossier/sortie/
 
 # Désactiver la colorisation automatique des images N&B
 python -m fluxgym_coach.image_enhancement "dossier/images/*.jpg" --no-colorize --output dossier/sortie/

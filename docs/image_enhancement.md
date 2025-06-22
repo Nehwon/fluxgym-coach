@@ -70,6 +70,12 @@ python -m fluxgym_coach.image_enhancement chemin/vers/image.jpg -o chemin/vers/s
 - `upscaler` : Nom de l'upscaler à utiliser (par défaut : "R-ESRGAN 4x+ Anime6B")
 - `denoising_strength` : Force du débruiteur (0-1, par défaut : 0.5)
 
+#### Paramètres de cache
+- `use_cache` : Active ou désactive le cache (par défaut : `True`)
+- `cache_dir` : Répertoire personnalisé pour le cache (par défaut : `~/.cache/fluxgym-coach`)
+- `force_reprocess` : Force le retraitement même si le résultat est en cache (par défaut : `False`)
+- `clean_cache` : Nettoie les entrées obsolètes du cache avant le traitement (par défaut : `False`)
+
 #### Paramètres de génération
 - `prompt` : Prompt pour guider l'amélioration (par défaut : "high quality, high resolution, detailed")
 - `negative_prompt` : Éléments à éviter (par défaut : "blurry, lowres, low quality, artifacts, jpeg artifacts")
