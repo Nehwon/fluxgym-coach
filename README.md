@@ -57,10 +57,14 @@ With its intelligent caching system, Fluxgym-coach optimizes performance by avoi
 - `black`: Code formatting
 - `mypy`: Type checking
 - `pytest-cov`: Test coverage
+- `pytest-httpx`: HTTP request mocking for tests
+- `codecov`: Code coverage reporting
 
 > **Note**: For image enhancement, a running Stable Diffusion WebUI Forge server is required.
 
 ## 🧪 Running Tests
+
+### Unit Tests
 
 To run the test suite:
 
@@ -76,6 +80,47 @@ pytest --cov=fluxgym_coach --cov-report=term-missing
 
 # Run type checking
 mypy .
+```
+
+### Integration Tests
+
+Integration tests require a mock Stable Diffusion API server. The test suite includes mocks for the API responses.
+
+```bash
+# Run all tests including integration tests
+pytest tests/
+
+# Run only integration tests
+pytest tests/integration/
+```
+
+## 🔄 Continuous Integration
+
+The project uses GitHub Actions for CI/CD. The workflow includes:
+
+- Running tests on Python 3.9, 3.10, and 3.11
+- Code coverage reporting
+- Linting with flake8
+- Type checking with mypy
+
+The CI pipeline runs on every push to main/master/develop branches and on pull requests.
+
+### Code Coverage
+
+Code coverage is tracked and reported to Codecov. The build will fail if coverage drops below 80%.
+
+To view coverage reports locally:
+
+```bash
+# Generate HTML coverage report
+pytest --cov=fluxgym_coach --cov-report=html
+
+# Open the report in your browser
+xdg-open htmlcov/index.html  # Linux
+# or
+open htmlcov/index.html      # macOS
+# or
+start htmlcov/index.html     # Windows
 ```
 
 ## 🚀 Installation
@@ -126,7 +171,31 @@ The cache system can be controlled with the following options:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please follow these steps to contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Development Setup
+
+1. Install development dependencies:
+   ```bash
+   pip install -e ".[dev]"
+   pre-commit install
+   ```
+
+2. Run tests before committing:
+   ```bash
+   pytest
+   mypy .
+   black .
+   flake8
+   ```
+
+3. The CI pipeline will run additional checks on your pull request.
 
 ## 📝 Development Protocol
 
