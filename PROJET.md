@@ -1,74 +1,112 @@
-# Plan
+# FluxGym Coach - Amélioration d'images avec IA
 
-## Notes
-- Le dépôt distant est `ssh://git@gitea.lamachere.fr:2222/fabrice/Fluxgym-coach.git`.
-- La branche `main` a été corrigée en utilisant la branche `master` comme base, et a été forcée sur le dépôt distant.
-- Le fichier `.gitignore` a été mis à jour pour exclure les fichiers compilés Python.
-- Le travail reprend sur la base des fichiers `TODO.md` et `PROJET.md`.
-- Le projet est maintenant nettoyé et prêt pour le développement.
-- Les tests unitaires pour `ImageCache` ont été créés et passent avec succès.
-- `ImageProcessor` a été mis à jour pour utiliser `ImageCache`.
-- Les tests pour `ImageProcessor` ont été mis à jour et passent avec succès.
-- Le test `test_main_success` dans `tests/test_cli.py` a été corrigé avec succès en ajustant les mocks.
-- Les tests pour `setup_cache` ont été créés dans un fichier séparé (`tests/test_setup_cache.py`) et passent avec succès, après des difficultés à modifier `test_cli.py` directement.
-- Les tests `test_main_verbose` et `test_main_processing_error` ont été recréés dans un nouveau fichier (`tests/test_cli_extra.py`) et passent avec succès.
+## Table des matières
+- [Aperçu](#aperçu)
+- [Fonctionnalités](#fonctionnalités)
+- [Installation](#installation)
+- [Utilisation](#utilisation)
+- [Feuille de route](#feuille-de-route)
+- [Contribution](#contribution)
+- [Licence](#licence)
 
-## Règles à respecter
-- Tous les développements doivent respecter les règles définies dans `PROTOCOLE_RACINE.md`
-- Les messages de commit doivent suivre la convention [Conventional Commits](https://www.conventionalcommits.org/)
-- Les Pull Requests doivent être revues par au moins un autre développeur
-- La couverture de code doit être maintenue au-dessus de 80%
+## Aperçu
 
-## Task List
-- [x] Configurer le dépôt distant.
-- [x] Récupérer les données du dépôt distant.
-- [x] Basculer sur la branche `main`.
-- [x] Vérifier la présence du fichier `LICENSE`.
-- [x] Ajouter tous les fichiers non suivis à l'index.
-- [x] Créer un commit pour les nouveaux fichiers.
-- [x] Pousser le commit vers le dépôt distant.
-- [x] Valider que tous les fichiers locaux sont présents sur le dépôt distant.
-- [x] Investiguer la disparition des fichiers source `.py`.
-- [x] Restaurer les fichiers source depuis le dépôt Git (trouvés sur la branche `master`).
-- [x] Réinitialiser la branche `main` pour qu'elle corresponde à l'état de la branche `master`.
-- [x] Forcer le push de la branche `main` corrigée vers le dépôt distant (`git push --force`).
-- [x] Mettre à jour le fichier `.gitignore` pour ignorer les fichiers `.pyc` et les répertoires `__pycache__`.
-- [x] Nettoyer les fichiers inutiles (comme les `.pyc`) de l'index Git.
-- [x] Créer un commit pour la mise à jour du `.gitignore` et le nettoyage de l'index.
-- [x] Pousser les modifications du `.gitignore` vers le dépôt distant.
-- [x] Créer le fichier de test `tests/test_image_cache.py`.
-- [x] Écrire les tests unitaires pour la classe `ImageCache`.
-  - [x] Tester le calcul de hash (`calculate_file_hash`).
-  - [x] Tester la génération de clé de cache (`get_cache_key`).
-  - [x] Tester l'ajout et la vérification d'entrées dans le cache (`add_to_cache`, `is_cached`).
-  - [x] Tester la persistance du cache sur disque (`_load_cache`, `_save_cache`).
-- [x] Intégrer `ImageCache` dans `ImageProcessor`.
-  - [x] Modifier `ImageProcessor.__init__` pour accepter une instance de `ImageCache`.
-  - [x] Mettre à jour `process_image` pour utiliser `ImageCache`.
-  - [x] Supprimer la méthode `generate_file_hash` de `ImageProcessor` car elle est redondante.
-- [x] Mettre à jour les tests dans `test_processor.py` pour refléter l'utilisation de `ImageCache`.
-- [x] Corriger les tests qui échouent dans `test_processor.py`.
-  - [x] Corriger `test_process_image` pour ne plus utiliser `generate_file_hash`.
-  - [x] Corriger l'assertion dans `test_process_images_function`.
-- [x] Ajouter les options de ligne de commande pour contrôler le cache.
-- [x] Utiliser le cache configuré dans le traitement des images (`cli.py`).
-- [x] Mettre à jour les tests pour `cli.py` pour couvrir les options de cache.
-  - [x] Mettre à jour les imports dans `test_cli.py`.
-  - [x] Mettre à jour `test_parse_args` pour inclure les options de cache.
-  - [x] Corriger le test `test_main_success`.
-    - [x] Aligner les décorateurs `@patch` avec les arguments de la fonction.
-    - [x] Corriger le chemin du patch pour `get_default_cache` (doit être `fluxgym_coach.cli.get_default_cache`).
-    - [x] S'assurer que le test passe et que les assertions sont correctes.
-  - [x] Ajouter des tests pour la fonction `setup_cache`.
-    - [x] Tester la désactivation du cache (`--no-cache`).
-    - [x] Tester le répertoire de cache personnalisé.
-    - [x] Tester le nettoyage du cache (`--clean-cache`).
-    - [x] Tester le mode forcé (`--force-reprocess`).
-    - [x] Tester la gestion des erreurs d'initialisation.
-  - [x] Recréer `test_main_verbose` avec les mocks appropriés.
-  - [x] Recréer `test_main_processing_error` avec les mocks appropriés.
-- [x] Mettre à jour la documentation pour les fonctionnalités de cache.
-- [ ] Tester les performances avec et sans le cache.
+FluxGym Coach est un outil d'amélioration d'images basé sur l'IA, utilisant Stable Diffusion Forge pour augmenter la résolution et améliorer la qualité des images. Il supporte également la colorisation automatique des images en noir et blanc.
 
-## Current Goal
-Tester les performances du cache.
+## Fonctionnalités
+
+- Augmentation de la résolution des images (jusqu'à 4x)
+- Colorisation automatique des images en noir et blanc
+- Gestion du cache pour éviter les retraitements inutiles
+- Traitement par lots pour les grands ensembles d'images
+- Support de différents modèles d'upscaling
+- Interface en ligne de commande facile à utiliser
+
+## Installation
+
+1. Clonez le dépôt :
+   ```bash
+   git clone https://github.com/votre-utilisateur/fluxgym-coach.git
+   cd fluxgym-coach
+   ```
+
+2. Installez les dépendances :
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Assurez-vous que Stable Diffusion WebUI est en cours d'exécution et accessible à l'adresse `http://127.0.0.1:7860`
+
+## Utilisation
+
+### Pour améliorer une seule image :
+```bash
+python -m fluxgym_coach.image_enhancement --input image.jpg --output output.png
+```
+
+### Pour améliorer un dossier d'images :
+```bash
+python -m fluxgym_coach.image_enhancement --input dossier_images/ --output dossier_sortie/
+```
+
+### Options disponibles :
+- `--scale` : Facteur d'échelle (1-4, par défaut: 2)
+- `--upscaler` : Modèle d'upscaling à utiliser
+- `--colorize` : Activer la colorisation automatique
+- `--batch-size` : Nombre d'images à traiter en parallèle (par défaut: 5)
+- `--force` : Forcer le retraitement même si l'image est en cache
+
+## Feuille de route
+
+### Version 0.3.0 (En cours)
+- [x] **Phase 1 : Planification**
+  - [x] Analyser les fichiers TODO.md et PROJET.md
+  - [x] Définir les fonctionnalités prioritaires
+
+- [ ] **Phase 2 : Performances et Stabilité**
+  - [x] Analyser l'utilisation de la mémoire
+  - [ ] Optimiser l'utilisation de la mémoire pour les grands lots
+    - [x] Analyser le code existant
+    - [ ] Implémenter un traitement par lots (chunking)
+    - [ ] Ajouter un paramètre batch_size
+    - [ ] Gérer correctement la mémoire entre les lots
+  - [ ] Permettre le fonctionnement sous VRAM faible (10-12 Go)
+  - [ ] Implémenter le nettoyage automatique du cache
+  - [ ] Améliorer la gestion des erreurs et le logging
+
+- [ ] **Phase 3 : Application Web et Dockerisation**
+  - [ ] Développer une interface web
+  - [ ] Dockeriser l'application
+
+- [ ] **Phase 4 : Intégration des Modèles**
+  - [ ] Intégrer la dernière version de Fluxgym
+  - [ ] Intégrer Stable Diffusion Forge avec support Nvidia RTX 40XX
+
+- [ ] **Phase 5 : Fonctionnalités Avancées**
+  - [ ] Ajouter des options de prétraitement (détection de visages, etc.)
+  - [ ] Améliorer la qualité de la colorisation
+  - [ ] Ajouter le support des vidéos
+
+- [ ] **Phase 6 : Finalisation**
+  - [ ] Documentation complète
+  - [ ] Tests automatisés
+  - [ ] Optimisation des performances
+  - [ ] Préparation de la release
+
+## Contribution
+
+Les contributions sont les bienvenues ! Voici comment contribuer :
+
+1. Forkez le projet
+2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/AmazingFeature`)
+3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
+4. Poussez vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrez une Pull Request
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+
+---
+
+Dernière mise à jour : 23 juin 2024
