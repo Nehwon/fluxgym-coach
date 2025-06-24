@@ -5,6 +5,32 @@ Tous les changements notables de ce projet seront documentés dans ce fichier.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2024-06-24
+
+### Corrigé
+- **Gestion du cache** :
+  - Correction de la détection du cache pour le traitement par lots
+  - Amélioration de la génération des clés de cache pour une meilleure fiabilité
+  - Ajout de logs détaillés pour les opérations de cache
+- **Traitement par lots** :
+  - Correction de l'agrégation des résultats dans la méthode `upscale_batch`
+  - Amélioration de la gestion des erreurs pour les images en cache/non-cache
+  - Correction de l'erreur HTTP 422 dans les appels API par lots
+
+### Ajouté
+- **Documentation** :
+  - Ajout de DECISIONS.md pour le suivi des décisions techniques
+  - Mise à jour de la structure de la documentation du projet
+  - Amélioration de la documentation du code
+
+### Modifié
+- **Qualité du code** :
+  - Refactorisation du code de gestion du cache
+  - Amélioration des messages d'erreur et des logs
+  - Amélioration de la maintenabilité du code
+
+## [0.2.0] - 2024-06-23
+
 ## [0.1.0] - 2025-06-23
 
 ### Ajouté

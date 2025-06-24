@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2024-06-24
+
+### Fixed
+- **Cache Handling**:
+  - Fixed cache detection for batch processing
+  - Improved cache key generation for better reliability
+  - Added detailed logging for cache operations
+- **Batch Processing**:
+  - Fixed result aggregation in `upscale_batch` method
+  - Improved error handling for mixed cached/uncached images
+  - Fixed HTTP 422 error in batch API calls
+
+### Added
+- **Documentation**:
+  - Added DECISIONS.md for tracking technical decisions
+  - Updated project documentation structure
+  - Improved inline code documentation
+
+### Changed
+- **Code Quality**:
+  - Refactored cache management code
+  - Improved error messages and logging
+  - Enhanced code maintainability
+
+## [0.2.0] - 2024-06-23
+
 ## [0.1.0] - 2025-06-23
 
 ### Added

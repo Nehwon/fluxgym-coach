@@ -2,9 +2,18 @@
 
 ## 📅 Tâches en cours
 
+### Correction du traitement par lots
+- [x] Identifier le problème de détection du cache
+- [x] Ajouter des logs détaillés pour le débogage
+- [ ] Corriger la méthode `upscale_batch` pour une agrégation correcte des résultats
+  - [ ] Vérifier la gestion des index pour les résultats mis en cache
+  - [ ] Tester avec un mélange d'images en cache et non mises en cache
+  - [ ] Valider l'ordre des résultats en sortie
+- [ ] Nettoyer les logs de débogage après correction
+
 ### Amélioration des tests
 - [x] Créer des tests unitaires pour `image_enhancement.py`
-- [✓] Atteindre 100% de couverture de test pour `image_enhancement.py`
+- [x] Atteindre 100% de couverture de test pour `image_enhancement.py`
   - [x] Tester `ImageEnhancer`
   - [x] Tester `encode_image_to_base64`
   - [x] Tester `decode_and_save_base64`
@@ -106,6 +115,10 @@
 - [ ] Support du stockage cloud
 - [ ] API REST pour une utilisation en tant que service
 - [ ] Plugins pour les éditeurs d'images populaires
+- [ ] Correction de la luminosité des images
+- [ ] Correction des ombres des images
+- [ ] Correction des contrastes des images
+- [ ] Correction des couleurs des images
 
 ## 📚 Ressources
 - [Documentation Fluxgym](https://github.com/cocktailpeanut/fluxgym)

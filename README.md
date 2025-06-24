@@ -4,50 +4,18 @@
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Tests](https://img.shields.io/badge/tests-100%25-success)](https://github.com/psf/black)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/Nehwon/fluxgym-coach/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue)](https://github.com/Nehwon/fluxgym-coach/releases/tag/v0.2.1)
 
 Image dataset preparation assistant for Fluxgym
 
-## 📋 Description
+## 📋 Available Documentation
+
+- [English Documentation](README.en.md)
+- [Documentation en français](README.fr.md)
+
+## ℹ️ About
 
 Fluxgym-coach is a powerful tool designed to facilitate the preparation and optimization of image datasets for Fluxgym. It automates common image processing tasks, offering advanced enhancement features, cache management, and batch processing capabilities.
-
-With its intelligent caching system, Fluxgym-coach optimizes performance by avoiding unnecessary reprocessing, while providing great flexibility through its comprehensive command-line interface.
-
-## ✨ Key Features
-
-### 🚀 Image Enhancement
-- **Batch Processing**: Efficiently process multiple images in a single operation
-- **Intelligent Upscaling**: Increase resolution up to 4x
-- **Automatic Colorization**: Detect and colorize black and white images
-- **N/B Detection**: Intelligent grayscale image identification
-- **Format Conversion**: Support for PNG, JPG, WebP, and more
-- **Proportional Resizing**: Maintain aspect ratios
-
-### ⚡ Performance Optimization
-- **Smart Caching System**: Avoids unnecessary reprocessing
-  - File fingerprinting with `xxhash`
-  - Parameter-aware cache keys
-  - Automatic cleanup of invalid entries
-  - Persistent disk cache between sessions
-  - Cache usage statistics
-
-### 🛠️ Command Line Interface
-- Comprehensive cache control options
-- Verbose mode for debugging
-- Robust error handling with clear messages
-- Progress bar for long-running operations
-
-## 📦 Requirements
-
-### System
-- Python 3.8 or higher
-- pip (Python package manager)
-- Git (for cloning the repository)
-
-### Core Dependencies
-- `Pillow`: Image processing
-- `numpy`: Numerical computations
 - `requests`: HTTP requests
 - `python-multipart`: File uploads
 - `xxhash`: Fast fingerprinting
