@@ -107,11 +107,39 @@
 
 ## 8. Project Specifics
 
+### Batch Processing Guidelines
+
+#### Image Batch Processing
+- **Order Preservation**: Always maintain the original order of input images in the results
+- **Error Handling**: Handle individual image failures gracefully without failing the entire batch
+- **Performance**: Process images in batches when possible, with a fallback to individual processing
+- **Logging**: Include detailed logging for batch operations to facilitate debugging
+
+#### Cache Management
+- **Cache Keys**: Generate consistent cache keys using file hashes and processing parameters
+- **Cache Invalidation**: Implement proper cache invalidation when processing parameters change
+- **Cache Persistence**: Support both in-memory (session) and on-disk caching
+- **Cache Verification**: Always verify cached files exist before using them
+
+### Code Organization
+- Keep batch processing logic separate from individual image processing
+- Use clear naming conventions for batch-related functions and variables
+- Document batch size limitations and performance considerations
+
 ### Repository Structure
 - `src/`: Source code
+  - `fluxgym_coach/`: Main package
+    - `image_enhancement.py`: Core image processing and batch operations
+    - `image_cache.py`: Cache management implementation
+    - `utils/`: Utility modules
 - `tests/`: Test files
+  - `test_batch_processing.py`: Tests for batch operations
+  - `test_image_cache.py`: Tests for cache functionality
 - `docs/`: Documentation
+  - `PROJET.md`: Current project plan and task tracking
+  - `PROTOCOLE_RACINE.md`: Development protocol (this file)
 - `scripts/`: Utility scripts
+  - `test_*.py`: Test scripts for specific functionality
 
 ### Development Workflow
 1. Create a feature branch

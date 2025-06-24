@@ -53,54 +53,112 @@ class ImageEnhancer:
         self.cache = cache if cache is not None else get_default_cache()
         self._processed_paths: Set[Path] = set()  # Pour éviter les doublons dans un même traitement
         
-    def _call_api(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _call_api(self, endpoint: str, payload: Dict[str, Any], max_retries: int = 4, initial_delay: float = 1.0) -> Dict[str, Any]:
         """
-        Effectue un appel à l'API Stable Diffusion Forge.
+        Effectue un appel à l'API Stable Diffusion Forge avec mécanisme de réessai.
         
         Args:
             endpoint: Point de terminaison de l'API (ex: 'sdapi/v1/txt2img')
             payload: Données à envoyer à l'API
+            max_retries: Nombre maximum de tentatives (défaut: 4)
+            initial_delay: Délai initial avant la première tentative (en secondes, défaut: 1.0)
             
         Returns:
             Réponse de l'API sous forme de dictionnaire
             
         Raises:
-            URLError: Si la requête échoue
+            URLError: Si toutes les tentatives échouent
             json.JSONDecodeError: Si la réponse n'est pas du JSON valide
         """
         url = f"{self.api_url}/{endpoint}"
         data = json.dumps(payload).encode('utf-8')
         
-        logger.debug("Appel à l'API %s avec les données: %s", url, payload)
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
         
-        try:
-            request = requests.Request(
-                'POST',  # Ajout de la méthode HTTP explicite
-                url,
-                headers={'Content-Type': 'application/json'},
-                data=data
-            )
-            
-            with requests.Session() as session:
-                response = session.send(request.prepare(), timeout=self.timeout)
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"Tentative {attempt + 1}/{max_retries} - Appel de l'API à {url}...")
+                response = requests.post(
+                    url,
+                    data=data,
+                    headers=headers,
+                    timeout=self.timeout
+                )
                 response.raise_for_status()
-                response_data = response.text
-                result: Dict[str, Any] = json.loads(response_data)
-                return result
+                return response.json()
                 
-        except requests.exceptions.HTTPError as e:
-            # Gestion des erreurs HTTP (comme 404, 500, etc.)
-            status_code = getattr(e.response, 'status_code', 'inconnu')
-            reason = getattr(e.response, 'reason', 'Raison inconnue')
+            except requests.exceptions.HTTPError as e:
+                # Gestion des erreurs HTTP (comme 404, 500, etc.)
+                status_code = getattr(e.response, 'status_code', 'inconnu')
+                reason = getattr(e.response, 'reason', 'Raison inconnue')
+                
+                # Essayer d'extraire plus de détails de la réponse d'erreur
+                error_details = {}
+                try:
+                    error_response = e.response.json()
+                    if isinstance(error_response, dict):
+                        error_details = {
+                            'detail': error_response.get('detail'),
+                            'validation_error': error_response.get('validation_error'),
+                            'message': error_response.get('message')
+                        }
+                except (ValueError, AttributeError):
+                    try:
+                        error_details = {'response_text': e.response.text[:500] + '...' if e.response.text else 'Aucun détail supplémentaire'}
+                    except:
+                        error_details = {'error': 'Impossible de récupérer les détails de l\'erreur'}
+                
+                error_msg = f"Erreur HTTP {status_code} lors de l'appel à {url}: {reason}"
+                if error_details:
+                    error_msg += f"\nDétails de l'erreur: {json.dumps(error_details, indent=2, ensure_ascii=False)}"
+                
+                logger.error(error_msg)
+                last_exception = e
+                
+                # Si c'est une erreur 422 (Unprocessable Entity), on arrête les tentatives
+                if status_code == 422:
+                    logger.error("Erreur de validation des données. Arrêt des tentatives.")
+                    raise URLError(error_msg) from e
+                
+                # Ne pas réessayer pour les erreurs client (4xx) sauf 429 (Too Many Requests)
+                if 400 <= status_code < 500 and status_code != 429:
+                    logger.error(f"Erreur client: {error_msg}")
+                    break
+                    
+                logger.warning(f"{error_msg} - Tentative {attempt + 1}/{max_retries}")
+                
+            except (requests.exceptions.RequestException, ConnectionError) as e:
+                # Gestion des erreurs de connexion, timeout, etc.
+                error_msg = f"Erreur de connexion à {url}: {str(e)}"
+                last_exception = e
+                logger.warning(f"{error_msg} - Tentative {attempt + 1}/{max_retries}")
+                # Pour les erreurs 422, on ne réessaie pas car c'est une erreur de validation
+                if not (hasattr(last_exception, 'response') and getattr(last_exception.response, 'status_code', None) == 422):
+                    # Calculer le délai exponentiel avec un peu d'aléatoire (jitter)
+                    delay = min(initial_delay * (2 ** attempt) * (0.8 + 0.4 * random.random()), 60)  # Maximum 60 secondes
+                    logger.warning(f"{error_msg} - Nouvelle tentative dans {delay:.1f} secondes...")
+                    time.sleep(delay)
+                else:
+                    logger.error("Erreur de validation des données. Arrêt des tentatives.")
+                    break
+        
+        # Si on arrive ici, toutes les tentatives ont échoué
+        logger.error(f"Échec après {max_retries} tentatives")
+        if isinstance(last_exception, requests.exceptions.HTTPError):
+            status_code = getattr(last_exception.response, 'status_code', 'inconnu')
+            reason = getattr(last_exception.response, 'reason', 'Raison inconnue')
             error_msg = f"Erreur HTTP {status_code} lors de l'appel à {url}: {reason}"
-            logger.error(error_msg)
-            raise URLError(error_msg) from e
-            
-        except requests.exceptions.RequestException as e:
-            # Gestion des erreurs de connexion, timeout, etc.
-            error_msg = f"Impossible de se connecter à l'API à {url}: {e}"
-            logger.error(error_msg)
-            raise URLError(error_msg) from e
+            raise URLError(error_msg) from last_exception
+        else:
+            error_msg = f"Impossible de se connecter à l'API à {url} après {max_retries} tentatives"
+            if last_exception:
+                error_msg += f": {str(last_exception)}"
+            raise URLError(error_msg) from last_exception
     
     def preprocess_image(
         self, 
@@ -516,36 +574,41 @@ class ImageEnhancer:
             sampler_name=sampler_name
         )
         
-        # Préparation des images
-        encoded_images = []
-        output_paths = []
-        is_bw_list = []
+        # Initialiser la liste des résultats avec des valeurs par défaut
+        results = [(None, False)] * len(image_paths)
+        
+        # Liste pour stocker les images à traiter
         images_to_process = []
         
-        for img_path in image_paths:
+        # Vérifier le cache pour chaque image
+        for idx, img_path in enumerate(image_paths):
             try:
                 img_path = Path(img_path).resolve()
                 
                 # Vérifier si l'image a déjà été traitée dans cette session
-                if img_path in self._processed_paths and not force_reprocess:
+                if str(img_path) in self._processed_paths and not force_reprocess:
                     logger.debug(f"Image déjà traitée dans cette session: {img_path}")
                     continue
                 
-                # Déterminer le chemin de sortie
-                if output_dir is not None:
-                    output_path = output_dir / f"{img_path.stem}_upscaled.{output_format.lower()}"
-                else:
-                    output_path = img_path.parent / f"{img_path.stem}_upscaled.{output_format.lower()}"
+                # Générer le chemin de sortie
+                output_path = self._get_output_path(img_path, output_dir, output_format)
                 
-                # Vérifier le cache si activé
-                if (self.use_cache and not skip_cache and self.cache and 
-                    not force_reprocess and 
-                    self.cache.is_cached(img_path, output_path, cache_params)):
-                    logger.info(f"Image en cache, saut du traitement: {img_path}")
-                    self._processed_paths.add(img_path)
-                    output_paths.append(output_path)
-                    is_bw_list.append(False)
-                    continue
+                # Vérifier le cache
+                if self.use_cache and not skip_cache and self.cache and not force_reprocess:
+                    logger.debug(f"[DEBUG] Vérification du cache pour l'image {idx} ({img_path.name})...")
+                    logger.debug(f"[DEBUG] Chemin de sortie: {output_path}")
+                    logger.debug(f"[DEBUG] Paramètres du cache: {json.dumps(cache_params, indent=2, default=str)}")
+                    
+                    is_cached = self.cache.is_cached(img_path, output_path, cache_params)
+                    logger.debug(f"[DEBUG] Résultat de la vérification du cache pour {img_path.name}: {is_cached}")
+                    
+                    if is_cached:
+                        logger.info(f"[INFO] Image {idx} ({img_path.name}) en cache, saut du traitement: {img_path} -> {output_path}")
+                        self._processed_paths.add(str(img_path))
+                        results[idx] = (str(output_path), False)  # S'assurer que le chemin est une chaîne
+                        logger.debug(f"[DEBUG] Résultat mis à jour à l'index {idx}: {results[idx]}")
+                        logger.debug(f"[DEBUG] État actuel des résultats: {results}")
+                        continue
                 
                 # Prétraiter l'image
                 processed_img, is_bw = self.preprocess_image(img_path, output_format)
@@ -576,6 +639,7 @@ class ImageEnhancer:
                 
                 # Stocker les informations pour le traitement
                 images_to_process.append({
+                    'original_index': idx,  # Conserver l'index d'origine
                     'path': img_path,
                     'output_path': output_path,
                     'image': encoded_image,
@@ -584,45 +648,85 @@ class ImageEnhancer:
                 
             except Exception as e:
                 logger.error(f"Erreur lors du prétraitement de l'image {img_path}: {e}")
-                # Ajouter des valeurs par défaut pour cette image
-                output_paths.append(None)
-                is_bw_list.append(False)
+                # Garder la valeur par défaut (None, False) pour cette image
+                continue
         
-        # Si aucune image à traiter, retourner les résultats mis en cache
+        # Si aucune image à traiter, retourner les résultats actuels
         if not images_to_process:
-            return list(zip(output_paths, is_bw_list)) if output_paths else [(None, False)] * len(image_paths)
+            return results
         
         # Préparer la charge utile pour l'API
+        # Format basé sur l'implémentation de sdwebuiapi
         payload = {
-            "imageList": [{"data": img['image'], "name": f"image_{i}.{output_format.lower()}"}
-                         for i, img in enumerate(images_to_process) if img['image'] is not None],
             "resize_mode": 0,  # 0 = Just resize (ne pas forcer le carré)
             "show_extras_results": False,
-            "gfpgan_visibility": 0,
-            "codeformer_visibility": 0,
-            "codeformer_weight": 0,
-            "upscaling_resize": scale_factor,
-            "upscaling_resize_w": None,
-            "upscaling_resize_h": None,
-            "upscaling_crop": True,
+            "gfpgan_visibility": 0.0,
+            "codeformer_visibility": 0.0,
+            "codeformer_weight": 0.0,
+            "upscaling_resize": float(scale_factor),
+            "upscaling_resize_w": 1024,  # Largeur cible (sera mise à l'échelle par le facteur)
+            "upscaling_resize_h": 1024,  # Hauteur cible (sera mise à l'échelle par le facteur)
+            "upscaling_crop": False,  # Ne pas rogner pour conserver les proportions
             "upscaler_1": upscaler,
             "upscaler_2": "None",
-            "extras_upscaler_2_visibility": 0,
-            "upscale_first": False,
+            "extras_upscaler_2_visibility": 0.0,
+            "upscale_first": False
         }
         
-        # Appel à l'API
+        # Préparer la liste des images au format attendu par l'API
+        image_list = []
+        for i, img in enumerate(images_to_process):
+            if img['image'] is not None:
+                # Convertir l'image en base64 sans l'en-tête data:image/...
+                if isinstance(img['image'], str) and img['image'].startswith('data:image/'):
+                    # Si c'est déjà une chaîne base64 avec en-tête, extraire juste les données
+                    base64_data = img['image'].split(',', 1)[1] if ',' in img['image'] else img['image']
+                else:
+                    # Sinon, utiliser directement les données binaires
+                    base64_data = img['image']
+                
+                image_list.append({
+                    "data": base64_data,
+                    "name": f"image_{i}.{output_format.lower()}"
+                })
+        
+        # Appel à l'API avec gestion d'erreur améliorée
         try:
+            # Ajouter la liste des images au payload
+            payload['imageList'] = image_list
+            
+            # Préparer les données pour le logging (sans les données d'image complètes)
+            log_payload = {k: v for k, v in payload.items()}
+            if 'imageList' in log_payload:
+                log_payload['imageList'] = [{"name": img['name'], "data_length": len(img['data'])} 
+                                          for img in log_payload['imageList']]
+            
             logger.info(f"Envoi de la requête de traitement par lots pour {len(images_to_process)} images")
+            logger.debug(f"Payload de la requête : {json.dumps(log_payload, indent=2)}")
+            
+            # Appel à l'API
             response = self._call_api('sdapi/v1/extra-batch-images', payload)
             
-            if not isinstance(response, dict) or 'images' not in response or not response['images']:
-                raise ValueError("Réponse API invalide ou aucune image retournée")
+            # Vérification de la réponse
+            if not isinstance(response, dict):
+                raise ValueError(f"Réponse API invalide (type {type(response)}): {response}")
+                
+            if 'error' in response:
+                error_msg = response.get('error', 'Erreur inconnue')
+                if isinstance(error_msg, dict):
+                    error_msg = json.dumps(error_msg, indent=2)
+                raise ValueError(f"Erreur de l'API: {error_msg}")
+                
+            if 'images' not in response or not response['images']:
+                raise ValueError(f"Aucune image retournée dans la réponse: {json.dumps(response, indent=2)}")
+                
+            if len(response['images']) != len(images_to_process):
+                logger.warning(
+                    f"Nombre d'images retournées ({len(response['images'])}) "
+                    f"ne correspond pas au nombre d'images envoyées ({len(images_to_process)})"
+                )
             
-            # Initialiser les résultats avec les images en cache
-            results = list(zip(output_paths, is_bw_list))
-            
-            # Traiter les résultats
+            # Traiter les résultats de l'API
             for i, (img_data, img_info) in enumerate(zip(response['images'], images_to_process)):
                 if img_data and img_info['output_path']:
                     try:
@@ -637,24 +741,56 @@ class ImageEnhancer:
                                 cache_params
                             )
                         
-                        # Ajouter aux résultats
-                        results.append((output_path, img_info['is_bw']))
-                        self._processed_paths.add(img_info['path'])
-                        logger.info(f"Image {i+1}/{len(images_to_process)} sauvegardée avec succès: {output_path}")
+                        # Mettre à jour les résultats à l'index d'origine
+                        original_idx = img_info['original_index']
+                        results[original_idx] = (output_path, img_info['is_bw'])
+                        self._processed_paths.add(str(img_info['path']))
+                        logger.info(f"Image {i+1}/{len(images_to_process)} (index original: {original_idx}) sauvegardée avec succès: {output_path}")
                     except Exception as e:
-                        logger.error(f"Erreur lors de la sauvegarde de l'image {output_path}: {e}")
-                        results.append((None, img_info.get('is_bw', False)))
-                else:
-                    results.append((None, img_info.get('is_bw', False)))
+                        original_idx = img_info['original_index']
+                        logger.error(f"Erreur lors de la sauvegarde de l'image {output_path} (index original: {original_idx}): {e}")
+                        # Garder la valeur par défaut (None, False) pour cette image
+                        continue
             
             return results
             
         except Exception as e:
             logger.error(f"Erreur lors du traitement par lots: {e}")
-            # Retourner une liste avec des valeurs par défaut en cas d'erreur
-            error_results = list(zip(output_paths, is_bw_list))
-            error_results.extend([(None, False)] * (len(images_to_process) - len(error_results)))
-            return error_results
+            logger.error(f"Erreur lors du traitement par lots: {str(e)}")
+            logger.info("Tentative de traitement image par image...")
+            
+            # Fallback: traiter chaque image individuellement
+            for img_info in images_to_process:
+                try:
+                    original_idx = img_info['original_index']
+                    logger.info(f"Traitement individuel de l'image {img_info['path']} (index original: {original_idx})")
+                    
+                    result = self.upscale_image(
+                        image_path=img_info['path'],
+                        output_path=img_info['output_path'],
+                        scale_factor=scale_factor,
+                        upscaler=upscaler,
+                        denoising_strength=denoising_strength,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        steps=steps,
+                        cfg_scale=cfg_scale,
+                        sampler_name=sampler_name,
+                        output_format=output_format,
+                        auto_colorize=auto_colorize,
+                        colorize_prompt=colorize_prompt,
+                        colorize_negative_prompt=colorize_negative_prompt
+                    )
+                    # Mettre à jour les résultats à l'index d'origine
+                    results[original_idx] = (result[0], img_info['is_bw'])
+                    logger.info(f"Traitement individuel réussi pour l'index {original_idx}: {result[0]}")
+                except Exception as single_error:
+                    original_idx = img_info['original_index']
+                    logger.error(f"Échec du traitement individuel pour l'index {original_idx} ({img_info['path']}): {single_error}", exc_info=True)
+                    # Garder la valeur par défaut (None, False) pour cette image
+                    continue
+            
+            return results
     
     def upscale_image(
         self,
@@ -897,6 +1033,7 @@ def enhance_image(
         return result[0]  # Retourne uniquement le chemin pour la rétrocompatibilité
 
 
+def main():
     """Point d'entrée principal pour l'interface en ligne de commande."""
     import argparse
     import sys
@@ -960,11 +1097,27 @@ def enhance_image(
         # Développer les motifs glob et résoudre les chemins
         expanded_paths: List[Path] = []
         for pattern in args.image_paths:
+            pattern_path = Path(pattern).expanduser()
+            
+            # Si c'est un répertoire, ajouter tous les fichiers d'images
+            if pattern_path.is_dir():
+                image_extensions = {'*.jpg', '*.jpeg', '*.png', '*.webp'}
+                for ext in image_extensions:
+                    expanded_paths.extend(Path(pattern_path).glob('**/' + ext))
+                continue
+                
+            # Si c'est un fichier, l'ajouter directement
+            if pattern_path.is_file():
+                expanded_paths.append(pattern_path.resolve())
+                continue
+                
+            # Essayer avec glob pour les motifs
             matches = list(Path().glob(pattern))
-            if not matches and not Path(pattern).exists():
+            if not matches:
                 print(f"Avertissement : Aucun fichier ne correspond à '{pattern}'", file=sys.stderr)
                 continue
-            expanded_paths.extend(Path(p).resolve() for p in matches or [pattern])
+                
+            expanded_paths.extend(Path(p).resolve() for p in matches)
         
         if not expanded_paths:
             print("Erreur : Aucun fichier valide à traiter", file=sys.stderr)
@@ -992,13 +1145,15 @@ def enhance_image(
                 print("Erreur : Pour le traitement de plusieurs images, --output doit être un répertoire", 
                       file=sys.stderr)
                 sys.exit(1)
-                
-            print(f"Traitement de {len(expanded_paths)} images en lots de {args.batch_size}...")
+            
+            # Définir la taille du lot par défaut
+            batch_size = getattr(args, 'batch_size', 4)  # Valeur par défaut de 4 si batch_size n'est pas défini
+            print(f"Traitement de {len(expanded_paths)} images en lots de {batch_size}...")
             
             # Traiter les images par lots
-            for i in range(0, len(expanded_paths), args.batch_size):
-                batch = expanded_paths[i:i + args.batch_size]
-                print(f"\nTraitement du lot {i//args.batch_size + 1}/{(len(expanded_paths)-1)//args.batch_size + 1}...")
+            for i in range(0, len(expanded_paths), batch_size):
+                batch = expanded_paths[i:i + batch_size]
+                print(f"\nTraitement du lot {i//batch_size + 1}/{(len(expanded_paths)-1)//batch_size + 1}...")
                 
                 results = enhancer.upscale_batch(
                     image_paths=[str(p) for p in batch],
