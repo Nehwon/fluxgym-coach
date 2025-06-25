@@ -22,13 +22,8 @@ def _add_datetime_metadata(exif: Dict[str, Any], parts: List[str]) -> None:
     """Ajoute les informations de date et heure à la description."""
     if "DateTimeOriginal" in exif:
         try:
-            date_obj = datetime.strptime(
-                exif["DateTimeOriginal"],
-                "%Y:%m:%d %H:%M:%S"
-            )
-            parts.append(
-                f"Date de prise de vue: {date_obj.strftime('%d/%m/%Y %H:%M')}"
-            )
+            date_obj = datetime.strptime(exif["DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
+            parts.append(f"Date de prise de vue: {date_obj.strftime('%d/%m/%Y %H:%M')}")
         except (ValueError, TypeError):
             pass
 
@@ -57,7 +52,9 @@ def _add_shooting_parameters(exif: Dict[str, Any], parts: List[str]) -> None:
             if exposure < 1:
                 exposure = f"1/{int(1/exposure)}"
             exposure = f"{exposure}s"
-        elif isinstance(exposure, str) and "/" in exposure and not exposure.endswith("s"):
+        elif (
+            isinstance(exposure, str) and "/" in exposure and not exposure.endswith("s")
+        ):
             exposure = f"{exposure}s"
         parts.append(f"Vitesse d'obturation: {exposure}")
 
@@ -115,9 +112,7 @@ def save_description(description: str, output_path: Path) -> bool:
             f.write(description)
         return True
     except Exception as e:
-        logger.error(
-            f"Erreur lors de la sauvegarde de la description: {str(e)}"
-        )
+        logger.error(f"Erreur lors de la sauvegarde de la description: {str(e)}")
         return False
 
 
@@ -163,8 +158,6 @@ def process_descriptions(image_paths: List[Path], output_dir: Path) -> int:
                 )
 
         except Exception as e:
-            logger.error(
-                f"Erreur lors du traitement de {image_path}: {str(e)}"
-            )
+            logger.error(f"Erreur lors du traitement de {image_path}: {str(e)}")
 
     return success_count

@@ -25,7 +25,7 @@ def test_validate_path_existing_file(temp_dir: Path) -> None:
     # Valider le chemin avec l'ancien paramètre
     result = validate_path(test_file, must_exist=True, is_file=True)
     assert result == test_file, "Le chemin du fichier devrait être retourné tel quel"
-    
+
     # Valider avec le nouveau paramètre
     result = validate_path(test_file, must_exist=True, must_be_file=True)
     assert result == test_file, "Le chemin du fichier devrait être retourné tel quel"
@@ -46,7 +46,7 @@ def test_validate_path_nonexistent(tmp_path: Path) -> None:
     # Ne doit pas lever d'exception si must_exist=False (ancienne méthode)
     result = validate_path(non_existent, must_exist=False)
     assert str(result) == str(non_existent.resolve())
-    
+
     # Ne doit pas lever d'exception si must_exist=False (nouvelle méthode)
     result = validate_path(non_existent, must_exist=False, must_be_file=False)
     assert str(result) == str(non_existent.resolve())
@@ -62,10 +62,10 @@ def test_validate_path_create_directory(temp_dir: Path) -> None:
     )
     assert result == new_dir, "Le chemin du répertoire devrait être retourné"
     assert new_dir.is_dir(), "Le répertoire devrait être créé automatiquement"
-    
+
     # Supprimer le répertoire pour le test suivant
     new_dir.rmdir()
-    
+
     # Valider avec création automatique (nouvelle méthode)
     result = validate_path(
         new_dir, must_exist=False, must_be_dir=True, create_if_missing=True
