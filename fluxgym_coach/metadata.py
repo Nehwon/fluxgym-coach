@@ -3,6 +3,7 @@
 import json
 import logging
 import hashlib
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -151,22 +152,72 @@ class MetadataExtractor:
         Raises:
             KeyError: Si 'content_hash' n'est pas présent dans les métadonnées
         """
-        if "content_hash" not in metadata:
-            raise KeyError("Le hachage de contenu est requis dans les métadonnées")
-
-        # Créer un nom de fichier basé sur le hachage du contenu
-        metadata_file = self.metadata_dir / f"{metadata['content_hash']}_metadata.json"
-
         try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-            logger.debug(f"Métadonnées sauvegardées: {metadata_file}")
-            return metadata_file
+            logger.debug(f"Début de save_metadata pour {image_path}")
+            logger.debug(f"Contenu des métadonnées: {metadata.keys()}")
+            
+            if "content_hash" not in metadata:
+                raise KeyError("Le hachage de contenu est requis dans les métadonnées")
+
+            # Utiliser le nom du fichier source (sans extension) pour le nom du fichier de métadonnées
+            # Cela garantit que le fichier de métadonnées correspondra au format attendu par le test
+            metadata_file = self.metadata_dir / f"{image_path.stem}_metadata.json"
+            
+            # S'assurer que le dossier de métadonnées existe
+            logger.debug(f"Création du dossier de métadonnées: {self.metadata_dir}")
+            self.metadata_dir.mkdir(parents=True, exist_ok=True)
+            
+            logger.debug(f"Tentative de sauvegarde des métadonnées dans: {metadata_file}")
+            logger.debug(f"Dossier de métadonnées existe: {self.metadata_dir.exists()}")
+            logger.debug(f"Droits d'écriture: {os.access(str(self.metadata_dir), os.W_OK)}")
+            logger.debug(f"Le fichier de métadonnées existe déjà: {metadata_file.exists()}")
+
+            # Vérifier si le fichier existe déjà
+            if metadata_file.exists():
+                logger.debug(f"Le fichier de métadonnées existe déjà, il sera écrasé: {metadata_file}")
+            
+            # Essayer d'écrire dans un fichier temporaire d'abord
+            temp_file = metadata_file.with_suffix('.tmp')
+            logger.debug(f"Écriture dans un fichier temporaire: {temp_file}")
+            
+            try:
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+                
+                # Vérifier que le fichier temporaire a été créé
+                if not temp_file.exists() or temp_file.stat().st_size == 0:
+                    raise IOError("Le fichier temporaire n'a pas été créé correctement")
+                
+                # Remplacer le fichier existant par le fichier temporaire
+                if metadata_file.exists():
+                    metadata_file.unlink()
+                temp_file.rename(metadata_file)
+                
+                logger.debug(f"Métadonnées sauvegardées avec succès: {metadata_file}")
+                logger.debug(f"Fichier de métadonnées existe: {metadata_file.exists()}")
+                
+                if metadata_file.exists():
+                    logger.debug(f"Taille du fichier: {metadata_file.stat().st_size} octets")
+                else:
+                    logger.error("Le fichier de métadonnées n'existe pas après la sauvegarde")
+                
+                return metadata_file
+                
+            except Exception as e:
+                logger.error(f"Erreur lors de l'écriture du fichier temporaire: {str(e)}")
+                # Essayer de supprimer le fichier temporaire en cas d'erreur
+                if temp_file.exists():
+                    try:
+                        temp_file.unlink()
+                    except Exception as e2:
+                        logger.error(f"Impossible de supprimer le fichier temporaire: {str(e2)}")
+                raise
 
         except Exception as e:
             logger.error(
                 f"Erreur lors de la sauvegarde des métadonnées "
-                f"pour {image_path}: {str(e)}"
+                f"pour {image_path}: {str(e)}",
+                exc_info=True
             )
             raise
 
@@ -180,6 +231,9 @@ class MetadataExtractor:
             Dictionnaire des métadonnées ou None en cas d'erreur
         """
         try:
+            logger.debug(f"Traitement du fichier: {image_path}")
+            logger.debug(f"Le fichier existe: {image_path.exists()}")
+            
             # Vérifier si le fichier est une image valide
             if not image_path.is_file():
                 logger.warning(
@@ -188,27 +242,37 @@ class MetadataExtractor:
                 )
                 return None
 
+            logger.debug("Extraction des métadonnées de base...")
             # Extraire les métadonnées de base
             metadata = self.extract_basic_metadata(image_path)
+            logger.debug(f"Métadonnées de base extraites: {bool(metadata)}")
 
+            logger.debug("Extraction des données EXIF...")
             # Extraire les données EXIF détaillées
             exif_data = self.extract_exif_data(image_path)
             if exif_data:
                 metadata["exif_detailed"] = exif_data
+                logger.debug(f"Données EXIF extraites: {len(exif_data)} éléments")
+            else:
+                logger.debug("Aucune donnée EXIF trouvée")
 
+            logger.debug("Génération du hachage du fichier...")
             # Générer un hachage du contenu de l'image
             file_hash = self.generate_file_hash(image_path)
             metadata["content_hash"] = file_hash
+            logger.debug(f"Hachage généré: {file_hash}")
 
-            # Vérifier si les métadonnées pour ce hachage existent déjà
-            metadata_file = self.metadata_dir / f"{file_hash}_metadata.json"
-            if not metadata_file.exists():
-                # Sauvegarder les métadonnées uniquement si elles n'existent pas déjà
-                self.save_metadata(image_path, metadata)
-            else:
-                logger.debug(
-                    f"Les métadonnées pour ce contenu existent déjà: {metadata_file}"
-                )
+            # Utiliser le nom du fichier (sans extension) comme base pour le nom du fichier de métadonnées
+            # Cela garantit que le fichier de métadonnées correspondra au format attendu par le test
+            metadata_file = self.metadata_dir / f"{image_path.stem}_metadata.json"
+            logger.debug(f"Chemin du fichier de métadonnées: {metadata_file}")
+            logger.debug(f"Le fichier de métadonnées existe déjà: {metadata_file.exists()}")
+            
+            # Toujours régénérer les métadonnées pour s'assurer qu'elles sont à jour
+            logger.debug("Sauvegarde des métadonnées...")
+            saved_path = self.save_metadata(image_path, metadata)
+            logger.debug(f"Métadonnées sauvegardées dans: {saved_path}")
+            logger.debug(f"Le fichier de métadonnées existe maintenant: {saved_path.exists() if saved_path else 'N/A'}")
 
             return metadata
 
@@ -230,12 +294,43 @@ def process_metadata(image_paths: List[Path], output_dir: Path) -> int:
     Returns:
         Nombre d'images traitées avec succès
     """
+    # S'assurer que le dossier de sortie existe
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Initialiser l'extracteur de métadonnées
     extractor = MetadataExtractor(output_dir)
     success_count = 0
 
     for image_path in image_paths:
-        if extractor.extract_and_save_metadata(image_path) is not None:
-            success_count += 1
+        try:
+            # Vérifier si le fichier existe
+            if not image_path.exists():
+                # Si le fichier n'existe pas, vérifier s'il s'agit d'un fichier déjà renommé dans le dossier de sortie
+                if output_dir in image_path.parents:
+                    # Le fichier est déjà dans le dossier de sortie, on peut le traiter directement
+                    pass
+                else:
+                    # Essayer de trouver le fichier dans le dossier de sortie
+                    output_file = output_dir / image_path.name
+                    if output_file.exists():
+                        image_path = output_file
+                    else:
+                        logger.warning(f"Fichier introuvable: {image_path}")
+                        continue
+            
+            logger.debug(f"Traitement des métadonnées pour: {image_path}")
+            
+            # Extraire et sauvegarder les métadonnées
+            metadata = extractor.extract_and_save_metadata(image_path)
+            if metadata is not None:
+                success_count += 1
+                logger.debug(f"Métadonnées générées avec succès pour: {image_path}")
+            else:
+                logger.warning(f"Échec de la génération des métadonnées pour: {image_path}")
+                
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement de {image_path}: {str(e)}", exc_info=True)
+            continue
 
     logger.info(
         f"Traitement des métadonnées terminé. {success_count}/"

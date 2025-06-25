@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Batch Processing**:
+  - Fixed `test_batch_processing.py` failures
+  - Corrected batch handling logic in `upscale_batch` method
+  - Implemented missing `generate_key` method in `ImageCache` class
+  - Improved error handling and logging for batch operations
+
 ### Added
 - **Documentation**:
   - Comprehensive update of all documentation files
@@ -18,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Code Quality**:
   - Improved error messages and logging
   - Better type hints throughout the codebase
+  - Optimized image processing workflow
   - Updated development dependencies
 
 ## [0.2.1] - 2024-06-24

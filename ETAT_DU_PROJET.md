@@ -4,9 +4,9 @@
 Fluxgym-coach est un assistant pour la configuration des datasets à destination de fluxgym. L'objectif du programme est de prendre un dossier d'images dans la zone spécifique de l'utilisateur et de le préparer pour être utilisé par fluxgym. Le programme effectue le renommage des fichiers par hachage de contenu pour éviter les doublons, l'extraction des métadonnées, l'amélioration de la qualité des images, et la préparation des données pour l'entraînement.
 
 ## 📊 Version actuelle
-- **Version** : 0.5.0 (en développement)
-- **Dernière mise à jour** : 22/06/2025
-- **Statut** : Développement actif - Système de cache implémenté
+- **Version** : 0.5.1 (en développement)
+- **Dernière mise à jour** : 25/06/2025
+- **Statut** : Développement actif - Correction du traitement par lots
 - **Branche** : `FLUXGYM-COACH`
 - **Environnement** : Développement local avec Python 3.11+ et environnement virtuel
 - **Couverture de test** : 100% pour le module image_enhancement (tests de traitement par lots inclus)
@@ -233,8 +233,17 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ## 🔄 En Cours de Développement
 
-### Prochaine version (v0.3.0)
-- [ ] Intégration avec des modèles IA pour la génération de descriptions
+### Prochaine version (v0.5.1)
+- [x] Correction des échecs de test dans `test_batch_processing.py`
+- [x] Implémentation de la méthode manquante `generate_key` dans `ImageCache`
+- [x] Amélioration de la gestion des erreurs dans le traitement par lots
+- [ ] Documentation des modifications apportées
+
+### Prochaine version (v0.6.0)
+- [ ] Gestion avancée des dimensions d'image
+  - [ ] Prise en compte de la plus petite dimension pour l'upscale
+  - [ ] Ajout d'une étape d'augmentation de la résolution
+  - [ ] Implémentation d'un recadrage intelligent si nécessaire
 - [ ] Amélioration de la gestion des erreurs
 - [ ] Documentation de l'API
 - [ ] Optimisation des performances

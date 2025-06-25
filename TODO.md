@@ -29,6 +29,12 @@
 - [ ] Configurer la couverture de code dans GitHub Actions
 
 ### Amélioration des fonctionnalités
+- [ ] Gestion avancée des dimensions d'image
+  - [ ] Prendre en compte la plus petite dimension (hauteur ou largeur) pour l'upscale
+  - [ ] Ajouter une étape d'augmentation de la résolution en amont du workflow
+  - [ ] Implémenter un recadrage intelligent si nécessaire
+  - [ ] Tester avec différentes tailles et ratios d'aspect
+
 - [x] Implémenter la colorisation des images N&B
   - [x] Détection automatique des images N/B
   - [x] Intégration avec l'API Stable Diffusion

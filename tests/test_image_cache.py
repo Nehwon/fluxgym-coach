@@ -180,3 +180,98 @@ def test_cache_error_handling(mock_load, mock_dump, mock_file, temp_dir):
     
     # Vérifier que l'ajout a quand même fonctionné (en mémoire)
     assert cache.is_cached(test_file)
+
+
+def test_is_cached_with_return_path(temp_dir: Path) -> None:
+    """Teste is_cached avec le paramètre return_cached_path."""
+    # Créer un cache et un fichier de test
+    cache = ImageCache()
+    test_file = temp_dir / "test_with_path.jpg"
+    output_file = temp_dir / "output_with_path.jpg"
+    
+    # Créer les fichiers nécessaires
+    test_file.write_text("test content")
+    output_file.write_text("output content")
+    
+    # Ajouter au cache
+    cache.add_to_cache(test_file, output_path=output_file)
+    
+    # Tester sans le paramètre return_cached_path (compatibilité arrière)
+    assert cache.is_cached(test_file) is True
+    
+    # Tester avec return_cached_path=True
+    is_cached, cached_path = cache.is_cached(test_file, return_cached_path=True)
+    assert is_cached is True
+    assert cached_path == output_file.resolve()
+    
+    # Vérifier que le chemin retourné pointe vers un fichier existant
+    assert cached_path.exists()
+    assert cached_path.read_text() == "output content"
+
+
+def test_is_cached_with_return_path_not_cached(temp_dir: Path) -> None:
+    """Teste is_cached avec return_cached_path pour un fichier non en cache."""
+    cache = ImageCache()
+    test_file = temp_dir / "not_cached.jpg"
+    
+    # Le fichier n'est pas dans le cache
+    is_cached, cached_path = cache.is_cached(test_file, return_cached_path=True)
+    assert is_cached is False
+    assert cached_path is None
+
+
+def test_is_cached_with_return_path_and_params(temp_dir: Path) -> None:
+    """Teste is_cached avec return_cached_path et des paramètres de traitement."""
+    cache = ImageCache()
+    test_file = temp_dir / "test_with_params.jpg"
+    output_file = temp_dir / "output_with_params.jpg"
+    params = {"scale": 2, "quality": 90}
+    
+    # Créer les fichiers nécessaires
+    test_file.write_text("test content with params")
+    output_file.write_text("output content with params")
+    
+    # Ajouter au cache avec des paramètres
+    cache.add_to_cache(test_file, output_path=output_file, params=params)
+    
+    # Tester avec les mêmes paramètres
+    is_cached, cached_path = cache.is_cached(
+        test_file, 
+        output_path=output_file,
+        params=params,
+        return_cached_path=True
+    )
+    assert is_cached is True
+    assert cached_path == output_file.resolve()
+    
+    # Tester avec des paramètres différents (ne devrait pas correspondre)
+    is_cached, cached_path = cache.is_cached(
+        test_file,
+        output_path=output_file,
+        params={"scale": 1, "quality": 80},
+        return_cached_path=True
+    )
+    assert is_cached is False
+    assert cached_path is None
+
+
+def test_is_cached_with_return_path_error_handling(temp_dir: Path) -> None:
+    """Teste la gestion des erreurs avec return_cached_path."""
+    cache = ImageCache()
+    test_file = temp_dir / "error_test.jpg"
+    output_file = temp_dir / "error_output.jpg"
+    
+    # Créer le fichier source mais pas le fichier de sortie
+    test_file.write_text("test error handling")
+    
+    # Ajouter au cache avec un chemin de sortie qui n'existe pas
+    cache.add_to_cache(test_file, output_path=output_file)
+    
+    # is_cached devrait retourner False car le fichier de sortie n'existe pas
+    is_cached, cached_path = cache.is_cached(
+        test_file, 
+        output_path=output_file,
+        return_cached_path=True
+    )
+    assert is_cached is False
+    assert cached_path is None

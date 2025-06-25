@@ -77,6 +77,37 @@ class ImageCache:
             
         except IOError as e:
             logger.error(f"Erreur lors de la sauvegarde du cache: {e}")
+            
+    def generate_key(self, source_path: Union[str, Path], params: Optional[Dict] = None) -> str:
+        """
+        Génère une clé de cache unique pour une image et des paramètres donnés.
+        
+        Args:
+            source_path: Chemin vers le fichier source
+            params: Dictionnaire de paramètres de traitement (optionnel)
+            
+        Returns:
+            Une chaîne de caractères représentant la clé de cache
+        """
+        import hashlib
+        
+        # Normaliser le chemin source
+        source_path = str(Path(source_path).resolve())
+        
+        # Créer un hachage à partir du chemin source et des paramètres
+        hasher = hashlib.sha256()
+        hasher.update(source_path.encode('utf-8'))
+        
+        # Ajouter les paramètres au hachage s'ils sont fournis
+        if params:
+            # Trier les clés pour assurer un ordre cohérent
+            for key in sorted(params.keys()):
+                value = params[key]
+                if value is not None:  # Ignorer les valeurs None
+                    hasher.update(str(key).encode('utf-8'))
+                    hasher.update(str(value).encode('utf-8'))
+        
+        return hasher.hexdigest()
     
     @staticmethod
     def calculate_file_hash(file_path: Union[str, Path], chunk_size: int = 65536) -> str:
@@ -88,10 +119,11 @@ class ImageCache:
             chunk_size: Taille des blocs à lire (en octets)
             
         Returns:
-            Chaîne hexadécimale représentant l'empreinte du fichier
+            Chaîne hexadécimale représentant l'empreinte du fichier (64 caractères hexadécimaux)
         """
+        import hashlib
         file_path = Path(file_path)
-        hasher = xxhash.xxh64()
+        hasher = hashlib.sha256()
         
         try:
             with open(file_path, 'rb') as f:
@@ -103,7 +135,7 @@ class ImageCache:
             hasher.update(str(stat.st_size).encode())
             hasher.update(str(stat.st_mtime).encode())
             
-            return f"{hasher.hexdigest()}"
+            return hasher.hexdigest()
             
         except (IOError, OSError) as e:
             logger.error(f"Erreur lors du calcul de l'empreinte de {file_path}: {e}")
@@ -122,12 +154,25 @@ class ImageCache:
         """
         resolved_path = Path(file_path).resolve()
         file_path_str = str(resolved_path)
-        param_str = json.dumps(params, sort_keys=True) if params else ""
+        
+        # Créer une copie profonde des paramètres pour éviter de modifier l'original
+        if params is not None:
+            params = {k: v for k, v in params.items() if v is not None}
+            # Trier les clés pour assurer une sérialisation cohérente
+            params = dict(sorted(params.items()))
+            # Convertir tous les paramètres en chaînes pour éviter les problèmes de type
+            for k, v in params.items():
+                if isinstance(v, (list, dict, bool)):
+                    params[k] = json.dumps(v, sort_keys=True)
+            param_str = json.dumps(params, sort_keys=True)
+        else:
+            param_str = ""
         
         # Ajout de logs pour le débogage
         logger.debug(f"[CACHE] Génération de la clé de cache pour: {file_path}")
         logger.debug(f"[CACHE] Chemin résolu: {file_path_str}")
         logger.debug(f"[CACHE] Paramètres: {params}")
+        logger.debug(f"[CACHE] Paramètres sérialisés: {param_str}")
         
         cache_key = f"{file_path_str}:{param_str}"
         logger.debug(f"[CACHE] Clé de cache générée: {cache_key}")
@@ -138,8 +183,9 @@ class ImageCache:
         self, 
         source_path: Union[str, Path], 
         output_path: Optional[Union[str, Path]] = None,
-        params: Optional[Dict] = None
-    ) -> bool:
+        params: Optional[Dict] = None,
+        return_cached_path: bool = False
+    ) -> Union[bool, Tuple[bool, Optional[Path]]]:
         """
         Vérifie si une image est déjà dans le cache et que le fichier de sortie existe.
         
@@ -147,9 +193,14 @@ class ImageCache:
             source_path: Chemin vers le fichier source
             output_path: Chemin attendu du fichier de sortie (optionnel)
             params: Paramètres de traitement (optionnel)
+            return_cached_path: Si True, retourne un tuple (bool, Optional[Path]) contenant
+                              le statut du cache et le chemin du fichier en cache
             
         Returns:
-            True si l'image est en cache et que le fichier de sortie existe, False sinon
+            Si return_cached_path est False (par défaut):
+                bool: True si l'image est en cache et que le fichier de sortie existe, False sinon
+            Si return_cached_path est True:
+                Tuple[bool, Optional[Path]]: Un tuple contenant le statut du cache et le chemin du fichier en cache
         """
         try:
             # Normaliser les chemins pour éviter les problèmes de formatage
@@ -172,6 +223,8 @@ class ImageCache:
             # Vérifier que le fichier source existe
             if not source_path.exists():
                 logger.warning(f"[CACHE] Le fichier source n'existe pas: {source_path}")
+                if return_cached_path:
+                    return False, None
                 return False
             
             # Générer la clé de cache
@@ -182,6 +235,8 @@ class ImageCache:
             cache_entry = self.cache['entries'].get(cache_key)
             if not cache_entry:
                 logger.debug(f"[CACHE] Aucune entrée de cache trouvée pour la clé: {cache_key}")
+                if return_cached_path:
+                    return False, None
                 return False
                 
             logger.debug(f"[CACHE] Entrée de cache trouvée: {json.dumps(cache_entry, indent=2, default=str)}")
@@ -197,6 +252,8 @@ class ImageCache:
             
             if not is_hash_match:
                 logger.warning(f"[CACHE] Le hash du fichier source a changé: {source_path}")
+                if return_cached_path:
+                    return False, None
                 return False
             
             # Vérifier le fichier de sortie si spécifié
@@ -206,6 +263,8 @@ class ImageCache:
                 # Vérifier si le fichier de sortie existe
                 if not output_path.exists():
                     logger.warning(f"[CACHE] Le fichier de sortie n'existe pas: {output_path}")
+                    if return_cached_path:
+                        return False, None
                     return False
                 
                 # Si un chemin de sortie est en cache, vérifier qu'il correspond
@@ -220,6 +279,8 @@ class ImageCache:
                             f"[CACHE] Les chemins de sortie ne correspondent pas. "
                             f"Attendu: {output_path}, Trouvé: {cached_output}"
                         )
+                        if return_cached_path:
+                            return False, None
                         return False
                 else:
                     logger.debug("[CACHE] Aucun chemin de sortie dans l'entrée de cache, utilisation du chemin fourni")
@@ -230,14 +291,24 @@ class ImageCache:
                     logger.debug(f"[CACHE] Cache mis à jour avec le chemin de sortie: {output_path}")
             
             logger.debug("[CACHE] Vérification du cache réussie")
+            
+            # Si on demande de retourner le chemin en cache
+            if return_cached_path:
+                cached_output = None
+                if 'output_path' in cache_entry and cache_entry['output_path']:
+                    cached_output = Path(cache_entry['output_path'])
+                    if not cached_output.exists():
+                        logger.warning(f"[CACHE] Le fichier en cache n'existe pas: {cached_output}")
+                        return False, None
+                return True, cached_output
+                
             return True
             
         except Exception as e:
-            logger.error(f"[CACHE] Erreur lors de la vérification du cache pour {source_path}: {e}", exc_info=True)
-            return False
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la vérification du cache pour {source_path}: {e}", exc_info=True)
+            error_msg = f"[CACHE] Erreur lors de la vérification du cache pour {source_path}: {e}"
+            logger.error(error_msg, exc_info=True)
+            if return_cached_path:
+                return False, None
             return False
     
     def add_to_cache(
@@ -351,73 +422,6 @@ class ImageCache:
         except Exception as e:
             logger.error(f"Erreur lors du nettoyage du cache: {e}")
     
-    def get_cached_path(
-        self,
-        source_path: Union[str, Path],
-        scale_factor: Optional[float] = None,
-        output_dir: Optional[Union[str, Path]] = None,
-        **params: Any
-    ) -> Optional[Path]:
-        """
-        Récupère le chemin du fichier en cache pour une image source donnée.
-        
-        Args:
-            source_path: Chemin vers le fichier source
-            scale_factor: Facteur d'échelle utilisé pour le traitement (optionnel)
-            output_dir: Répertoire de sortie (optionnel, pour la génération du chemin de sortie)
-            **params: Paramètres supplémentaires de traitement
-            
-        Returns:
-            Chemin du fichier en cache s'il existe, None sinon
-        """
-        try:
-            source_path = Path(source_path).resolve()
-            
-            # Si des paramètres sont fournis, les utiliser pour la clé de cache
-            cache_params = params.copy()
-            if scale_factor is not None:
-                cache_params['scale_factor'] = scale_factor
-                
-            # Générer la clé de cache
-            cache_key = self.get_cache_key(source_path, cache_params)
-            
-            # Vérifier si l'entrée existe dans le cache
-            if cache_key not in self.cache['entries']:
-                return None
-                
-            cache_entry = self.cache['entries'][cache_key]
-            
-            # Vérifier que le fichier source n'a pas changé
-            current_hash = self.calculate_file_hash(source_path)
-            if cache_entry.get('hash') != current_hash:
-                return None
-                
-            # Si un chemin de sortie est spécifié dans le cache, le retourner
-            if 'output_path' in cache_entry:
-                output_path = Path(cache_entry['output_path'])
-                if output_path.exists():
-                    return output_path
-            
-            # Sinon, générer un chemin de sortie basé sur le répertoire de sortie
-            if output_dir is not None:
-                output_dir = Path(output_dir)
-                output_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Générer un nom de fichier unique basé sur le chemin source et les paramètres
-                source_stem = source_path.stem
-                param_hash = hashlib.md5(json.dumps(cache_params, sort_keys=True).encode()).hexdigest()[:8]
-                output_path = output_dir / f"{source_stem}_{param_hash}{source_path.suffix}"
-                
-                # Si le fichier existe déjà, le retourner
-                if output_path.exists():
-                    return output_path
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du chemin en cache pour {source_path}: {e}")
-            return None
-
 
 # Instance globale du cache
 _default_cache = None

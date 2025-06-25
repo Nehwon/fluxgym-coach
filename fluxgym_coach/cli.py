@@ -271,17 +271,10 @@ def main(args: Optional[Sequence[str]] = None) -> int:
 
         logger.info(f"{len(image_files)} images trouvées dans le dossier source.")
 
-        # Traitement en fonction de l'option sélectionnée
-        if parsed_args.process in ["all", "metadata"]:
-            from fluxgym_coach.metadata import process_metadata
-
-            success_count = process_metadata(image_files, output_dir)
-            logger.info(
-                f"Traitement des métadonnées terminé. "
-                f"{success_count}/{len(image_files)} images traitées avec succès."
-            )
-
-        # Traitement des images (renommage et traitement complet)
+        # Initialiser la liste des fichiers traités
+        processed_files = []
+        
+        # Traitement des images (renommage et traitement complet) en premier
         if parsed_args.process in ["all", "rename"]:
             from fluxgym_coach.processor import ImageProcessor
             
@@ -293,16 +286,85 @@ def main(args: Optional[Sequence[str]] = None) -> int:
                 cache_params=cache_params if cache else None
             )
             
-            # Traiter les images
-            processed_count = 0
-            for _ in processor.process_directory():
-                processed_count += 1
-                
+            # Traiter les images et récupérer les chemins des fichiers traités
+            logger.debug("Début du traitement des images...")
+            for original_path, new_path in processor.process_directory():
+                logger.debug(f"Image traitée - Original: {original_path}, Nouveau: {new_path}")
+                if new_path:  # Si le traitement a réussi
+                    processed_files.append(new_path)  # Conserver l'objet Path
+            
             action = "renommées et traitées" if parsed_args.process == "all" else "renommées"
             logger.info(
                 f"Traitement des images terminé. "
-                f"{processed_count} images {action} avec succès."
+                f"{len(processed_files)} images {action} avec succès."
             )
+            logger.debug(f"Liste des fichiers traités: {[str(p) for p in processed_files]}")
+            
+            # Mettre à jour la liste des fichiers pour les étapes suivantes
+            image_files = processed_files
+
+        # Traitement des métadonnées après le renommage
+        if parsed_args.process in ["all", "metadata"]:
+            from fluxgym_coach.metadata import process_metadata
+            
+            # Activer les logs de débogage pour le module metadata
+            logging.getLogger('fluxgym_coach.metadata').setLevel(logging.DEBUG)
+            logger.debug(f"=== DÉBUT DU TRAITEMENT DES MÉTADONNÉES (mode: {parsed_args.process}) ===")
+            
+            # Déterminer les chemins des fichiers à traiter
+            files_to_process = []
+            
+            if parsed_args.process == "all" and processed_files:
+                # Mode "all" : utiliser les fichiers traités
+                logger.debug(f"Mode 'all' - Nombre de fichiers traités: {len(processed_files)}")
+                logger.debug(f"Contenu de processed_files: {[str(p) for p in processed_files]}")
+                
+                # Les fichiers sont déjà des objets Path, on s'assure juste qu'ils sont absolus
+                files_to_process = [p.resolve() for p in processed_files]
+                logger.debug(f"Fichiers à traiter (chemins absolus): {[str(p) for p in files_to_process]}")
+            else:
+                # Mode "metadata" : utiliser les fichiers du répertoire d'entrée
+                logger.debug(f"Mode 'metadata' - Recherche des images dans: {input_dir}")
+                for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
+                    files = list(input_dir.glob(ext))
+                    logger.debug(f"Fichiers trouvés avec l'extension {ext}: {files}")
+                    files_to_process.extend(files)
+                
+                # Si aucun fichier n'est trouvé dans l'entrée, vérifier la sortie
+                if not files_to_process:
+                    logger.debug(f"Aucun fichier trouvé dans {input_dir}, vérification de {output_dir}")
+                    for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
+                        files = list(output_dir.glob(ext))
+                        logger.debug(f"Fichiers trouvés dans la sortie avec l'extension {ext}: {files}")
+                        files_to_process.extend(files)
+            
+            # Filtrer les fichiers existants
+            existing_files = [p for p in files_to_process if p.exists()]
+            
+            if not existing_files:
+                logger.warning("Aucun fichier valide trouvé pour le traitement des métadonnées")
+            elif len(existing_files) < len(files_to_process):
+                missing = len(files_to_process) - len(existing_files)
+                logger.warning(f"{missing} fichiers introuvables pour le traitement des métadonnées")
+            
+            logger.debug(f"Chemins complets des fichiers à traiter: {existing_files}")
+            
+            if existing_files:
+                success_count = process_metadata(existing_files, output_dir)
+                logger.info(
+                    f"Traitement des métadonnées terminé. "
+                    f"{success_count}/{len(existing_files)} images traitées avec succès."
+                )
+                
+                # Vérifier si les fichiers de métadonnées ont été créés
+                metadata_dir = output_dir / "metadata"
+                if metadata_dir.exists():
+                    metadata_files = list(metadata_dir.glob("*.json"))
+                    logger.debug(f"Fichiers de métadonnées trouvés: {metadata_files}")
+                    for f in metadata_files:
+                        logger.debug(f"Taille de {f}: {f.stat().st_size} octets")
+            else:
+                logger.warning("Aucun fichier valide trouvé pour le traitement des métadonnées")
 
         # Génération des descriptions
         if parsed_args.process in ["all", "description"]:

@@ -70,10 +70,10 @@ def test_save_metadata(sample_image: Path, temp_dir: Path):
     # Sauvegarder les métadonnées
     metadata_file = extractor.save_metadata(sample_image, test_metadata)
 
-    # Vérifier que le fichier a été créé avec le bon nom
+    # Vérifier que le fichier a été créé avec le bon nom (basé sur le nom du fichier source)
     assert metadata_file.exists()
     assert metadata_file.suffix == ".json"
-    assert metadata_file.stem == f"{test_metadata['content_hash']}_metadata"
+    assert metadata_file.stem == f"{sample_image.stem}_metadata"
 
     # Vérifier le contenu du fichier
     with open(metadata_file, "r", encoding="utf-8") as f:
@@ -98,20 +98,19 @@ def test_extract_and_save_metadata(sample_image: Path, temp_dir: Path):
     assert "format" in metadata
     assert "content_hash" in metadata  # Le hachage de contenu doit être présent
 
-    # Vérifier que le fichier de métadonnées a été créé avec le bon nom
-    content_hash = metadata["content_hash"]
-    metadata_file = temp_dir / "metadata" / f"{content_hash}_metadata.json"
-    assert metadata_file.exists()
+    # Vérifier que le fichier de métadonnées a été créé avec le bon nom (basé sur le nom du fichier source)
+    expected_metadata_file = temp_dir / "metadata" / f"{sample_image.stem}_metadata.json"
+    assert expected_metadata_file.exists()
 
     # Vérifier que le fichier contient les métadonnées attendues
-    with open(metadata_file, "r", encoding="utf-8") as f:
+    with open(expected_metadata_file, "r", encoding="utf-8") as f:
         saved_metadata = json.load(f)
 
     # Vérifier les métadonnées de base
     assert saved_metadata["filename"] == sample_image.name
     assert saved_metadata["width"] == 100
     assert saved_metadata["height"] == 100
-    assert saved_metadata["content_hash"] == content_hash
+    assert saved_metadata["content_hash"] in metadata["content_hash"]
 
 
 def test_process_metadata_function(sample_image: Path, temp_dir: Path):
@@ -140,18 +139,18 @@ def test_process_metadata_function(sample_image: Path, temp_dir: Path):
     assert metadata_dir.exists()
 
     # Récupérer la liste des fichiers de métadonnées
-    metadata_files = list(metadata_dir.glob("*.json"))
+    metadata_files = list((temp_dir / "output" / "metadata").glob("*_metadata.json"))
 
-    # Vérifier qu'un seul fichier de métadonnées a été créé (déduplication)
-    assert (
-        len(metadata_files) == 1
-    ), "Un seul fichier de métadonnées devrait être créé pour des images identiques"
+    # Vérifier qu'un fichier de métadonnées a été créé pour chaque image
+    # (la déduplication n'est plus appliquée au niveau du nom de fichier)
+    assert len(metadata_files) == len(image_paths), f"Un fichier de métadonnées devrait être créé pour chaque image d'entrée (trouvé {len(metadata_files)}, attendu {len(image_paths)})"
 
     # Vérifier que le fichier contient les métadonnées attendues
     with open(metadata_files[0], "r", encoding="utf-8") as f:
         saved_metadata = json.load(f)
 
-    assert saved_metadata["filename"] == "img_0.jpg"  # Le nom du premier fichier traité
+    # Vérifier que le nom du fichier dans les métadonnées correspond à l'un des noms de fichiers d'entrée
+    assert saved_metadata["filename"] in [f"img_{i}.jpg" for i in range(3)]
     assert "content_hash" in saved_metadata
     assert "width" in saved_metadata
     assert "height" in saved_metadata

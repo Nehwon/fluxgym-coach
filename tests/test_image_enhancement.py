@@ -186,7 +186,8 @@ def test_enhance_image_function(temp_image, tmp_path):
     
     # Utiliser un mock pour éviter d'appeler l'API réelle
     with patch('fluxgym_coach.image_enhancement.ImageEnhancer.upscale_image') as mock_upscale:
-        mock_upscale.return_value = (output_path, False)
+        expected_result = (output_path, False)
+        mock_upscale.return_value = expected_result
         
         result = enhance_image(
             image_path=temp_image,
@@ -194,7 +195,7 @@ def test_enhance_image_function(temp_image, tmp_path):
             api_url="http://mock-api"
         )
         
-        assert result == output_path
+        assert result == expected_result
         mock_upscale.assert_called_once()
 
 
@@ -283,19 +284,23 @@ def test_preprocess_image_variations(temp_image, temp_bw_image, tmp_path):
     assert img_rgba.mode == 'RGB'  # Doit être converti en RGB
 
 
-def test_call_api_error_handling():
-    """Teste la gestion des erreurs dans _call_api."""
-    # Tester avec une erreur de connexion
-    with patch('fluxgym_coach.image_enhancement.requests.Session') as mock_session:
+def test_call_api_connection_error():
+    """Teste la gestion des erreurs de connexion dans _call_api."""
+    with patch('fluxgym_coach.image_enhancement.requests.post') as mock_post:
         # Configurer le mock pour simuler une erreur de connexion
-        mock_session.return_value.__enter__.return_value.send.side_effect = requests.exceptions.RequestException("Erreur de connexion")
+        mock_post.side_effect = requests.exceptions.RequestException("Erreur de connexion")
         
         enhancer = ImageEnhancer()
-        with pytest.raises(URLError, match="Impossible de se connecter"):
-            enhancer._call_api("test/endpoint", {})
-    
-    # Tester avec une erreur HTTP 404
-    with patch('fluxgym_coach.image_enhancement.requests.Session') as mock_session:
+        with patch('fluxgym_coach.image_enhancement.time.sleep'):  # Mock sleep pour accélérer les tests
+            with pytest.raises(URLError) as exc_info:
+                enhancer._call_api("test/endpoint", {})
+            assert "Impossible de se connecter à l'API" in str(exc_info.value)
+
+
+def test_call_api_http_404_error():
+    """Teste la gestion des erreurs HTTP 404 dans _call_api."""
+    with patch('fluxgym_coach.image_enhancement.requests.post') as mock_post, \
+         patch('fluxgym_coach.image_enhancement.time.sleep') as mock_sleep:
         # Créer un mock de réponse avec un statut 404
         mock_response = MagicMock()
         mock_response.status_code = 404
@@ -304,13 +309,14 @@ def test_call_api_error_handling():
         mock_response.json.return_value = {"error": "Not found"}
         
         # Configurer raise_for_status pour lever une HTTPError
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        http_error = requests.exceptions.HTTPError(
             "404 Not Found", 
             response=mock_response
         )
+        mock_response.raise_for_status.side_effect = http_error
         
-        # Configurer le mock de session pour retourner notre réponse
-        mock_session.return_value.__enter__.return_value.send.return_value = mock_response
+        # Configurer le mock pour retourner notre réponse
+        mock_post.return_value = mock_response
         
         # Créer une nouvelle instance pour utiliser le mock
         enhancer = ImageEnhancer()
@@ -323,9 +329,14 @@ def test_call_api_error_handling():
         error_msg = str(exc_info.value)
         assert "404" in error_msg
         assert "Not Found" in error_msg
-    
-    # Tester avec une réponse JSON invalide
-    with patch('fluxgym_coach.image_enhancement.requests.Session') as mock_session:
+        
+        # Vérifier que sleep n'a pas été appelé (car on sort immédiatement après une erreur 404)
+        mock_sleep.assert_not_called()
+
+
+def test_call_api_invalid_json():
+    """Teste la gestion des réponses JSON invalides dans _call_api."""
+    with patch('fluxgym_coach.image_enhancement.requests.post') as mock_post:
         # Créer un mock de réponse avec du JSON invalide
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -333,8 +344,8 @@ def test_call_api_error_handling():
         mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "not a valid json", 0)
         mock_response.raise_for_status.return_value = None  # Ne pas lever d'exception
         
-        # Configurer le mock de session pour retourner notre réponse
-        mock_session.return_value.__enter__.return_value.send.return_value = mock_response
+        # Configurer le mock pour retourner notre réponse
+        mock_post.return_value = mock_response
         
         enhancer = ImageEnhancer()
         with pytest.raises(json.JSONDecodeError):
@@ -802,15 +813,18 @@ def test_upscale_batch_with_error_handling(temp_image, tmp_path):
             output_dir=tmp_path
         )
         
-        # Vérifier que nous avons un résultat uniquement pour l'image valide
-        # (les images invalides sont ignorées dans l'implémentation actuelle)
-        assert len(results) == 1
+        # Vérifier que nous avons un résultat pour chaque image d'entrée
+        assert len(results) == 3
         
-        # L'image valide devrait être traitée avec succès
-        output_path, is_bw = results[0]
-        assert output_path is not None
-        assert output_path.exists()
-        assert isinstance(is_bw, bool)
+        # Vérifier que l'image valide a été traitée avec succès
+        output_path1, is_bw1 = results[0]
+        assert output_path1 is not None
+        assert output_path1.exists()
+        assert isinstance(is_bw1, bool)
+        
+        # Vérifier que les images invalides retournent None
+        assert results[1] == (None, False)
+        assert results[2] == (None, False)
         
     finally:
         # Restaurer la méthode originale

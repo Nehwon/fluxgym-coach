@@ -18,10 +18,10 @@ def test_end_to_end_processing(tmp_path: Path, sample_image: Path):
     for i in range(3):
         shutil.copy2(sample_image, input_dir / f"test_{i}.jpg")
 
-    # Exécuter la commande CLI
+    # Exécuter la commande CLI en mode verbeux
     with patch(
         "sys.argv",
-        ["fluxgym-coach", "--input", str(input_dir), "--output", str(output_dir)],
+        ["fluxgym-coach", "--input", str(input_dir), "--output", str(output_dir), "--verbose"],
     ):
         result = cli_main()
 

@@ -7,6 +7,13 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé
+- **Traitement par lots** :
+  - Correction des échecs de `test_batch_processing.py`
+  - Correction de la logique de traitement par lots dans la méthode `upscale_batch`
+  - Implémentation de la méthode manquante `generate_key` dans la classe `ImageCache`
+  - Amélioration de la gestion des erreurs et des journaux pour les opérations par lots
+
 ### Ajouté
 - **Documentation** :
   - Mise à jour complète de tous les fichiers de documentation
@@ -18,6 +25,7 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Qualité du code** :
   - Amélioration des messages d'erreur et des journaux
   - Meilleure utilisation des annotations de type
+  - Optimisation du flux de traitement d'images
   - Mise à jour des dépendances de développement
 
 ## [0.2.1] - 2024-06-24

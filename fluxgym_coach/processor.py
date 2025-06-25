@@ -107,8 +107,12 @@ class ImageProcessor:
             # Vérifier si l'image est déjà dans le cache
             new_path = self.output_dir / f"{file_path.stem}{file_path.suffix}"
             
-            if self.cache.is_cached(file_path, output_path=new_path, params=params):
-                logger.debug(f"Image déjà dans le cache: {file_path}")
+            is_cached, cached_path = self.cache.is_cached(file_path, output_path=new_path, params=params, return_cached_path=True)
+            if is_cached and cached_path:
+                logger.debug(f"Image déjà dans le cache: {file_path} -> {cached_path}")
+                return (file_path, cached_path)
+            elif is_cached:  # Cas où l'image est en cache mais pas de chemin retourné (ne devrait pas arriver)
+                logger.warning(f"Image marquée comme en cache mais pas de chemin retourné: {file_path}")
                 return (file_path, new_path)
 
             # Créer un nouveau nom de fichier basé sur le hachage du fichier

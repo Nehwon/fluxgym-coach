@@ -71,7 +71,7 @@ def test_cache_usage(sample_image: Path, temp_dir: Path, mock_cache) -> None:
     output_dir = temp_dir / "output"
     
     # Configurer le mock pour simuler un fichier non en cache
-    mock_cache.is_cached.return_value = False
+    mock_cache.is_cached.return_value = (False, None)
     
     # Initialiser le processeur avec le mock
     processor = ImageProcessor(temp_dir, output_dir, cache=mock_cache)
@@ -92,7 +92,7 @@ def test_process_image(sample_image: Path, temp_dir: Path, mock_cache) -> None:
     output_dir = temp_dir / "output"
     
     # Configurer le mock pour simuler un fichier non en cache
-    mock_cache.is_cached.return_value = False
+    mock_cache.is_cached.return_value = (False, None)
     mock_cache.calculate_file_hash.return_value = "testhash123"
     
     # Initialiser le processeur avec le mock
@@ -130,7 +130,8 @@ def test_process_image_duplicate(sample_image: Path, temp_dir: Path, mock_cache)
     output_dir = temp_dir / "output"
     
     # Configurer le mock pour simuler un fichier déjà en cache au deuxième appel
-    mock_cache.is_cached.side_effect = [False, True]
+    cached_path = output_dir / "cached_image.jpg"
+    mock_cache.is_cached.side_effect = [(False, None), (True, cached_path)]
     
     # Initialiser le processeur avec le mock
     processor = ImageProcessor(temp_dir, output_dir, cache=mock_cache)
@@ -197,7 +198,8 @@ def test_process_images_function(sample_image: Path, temp_dir: Path) -> None:
         mock_get_cache.return_value = mock_cache
         
         # Configurer le mock pour simuler des fichiers non en cache
-        mock_cache.is_cached.return_value = False
+        mock_cache.is_cached.return_value = (False, None)
+        mock_cache.calculate_file_hash.return_value = "testhash123"
         
         # Appeler la fonction à tester
         count = process_images(input_dir, output_dir)

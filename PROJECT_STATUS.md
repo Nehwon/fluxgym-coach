@@ -4,9 +4,9 @@
 Fluxgym-coach is an assistant for configuring datasets for fluxgym. The program's goal is to take a folder of images from the user's specific area and prepare it for use by fluxgym. The program performs file renaming using content hashing to avoid duplicates, metadata extraction, image quality enhancement, and data preparation for training.
 
 ## 📊 Current Version
-- **Version**: 0.5.0 (in development)
-- **Last Update**: 06/24/2024
-- **Status**: Active Development - Cache system implemented
+- **Version**: 0.5.1 (in development)
+- **Last Update**: 06/25/2025
+- **Status**: Active Development - Batch processing fixes
 - **Branch**: `FLUXGYM-COACH`
 - **Environment**: Local development with Python 3.11+ and virtual environment
 - **Test Coverage**: 100% for the image_enhancement module (including batch processing tests)
@@ -67,11 +67,20 @@ fluxgym-coach/
   - Static type checking with mypy
   - CI/CD pipeline with GitHub Actions
 
-## 🚧 In Progress
+## 🔄 In Progress
 
-### Next Version (v0.3.0)
-- [ ] Integration with AI models for description generation
-- [ ] Improved error handling
+### Next Version (v0.5.1)
+- [x] Fixed test failures in `test_batch_processing.py`
+- [x] Implemented missing `generate_key` method in `ImageCache`
+- [x] Improved error handling in batch processing
+- [ ] Documentation updates
+
+### Next Version (v0.6.0)
+- [ ] Advanced image dimension handling
+  - [ ] Consider smallest dimension for upscaling
+  - [ ] Add resolution enhancement step
+  - [ ] Implement smart cropping if needed
+- [ ] Error handling improvements
 - [ ] Enhanced logging system
 - [ ] Performance optimizations
 
