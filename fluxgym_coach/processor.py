@@ -22,7 +22,7 @@ class ImageProcessor:
         input_dir: Path,
         output_dir: Path,
         cache: Optional[ImageCache] = None,
-        cache_params: Optional[Dict[str, Any]] = None
+        cache_params: Optional[Dict[str, Any]] = None,
     ):
         """Initialise le processeur d'images.
 
@@ -34,7 +34,7 @@ class ImageProcessor:
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
-        
+
         # Initialiser le cache
         self.cache = cache or get_default_cache()
         if cache_params and not cache:
@@ -42,7 +42,7 @@ class ImageProcessor:
 
         # Créer le dossier de sortie s'il n'existe pas
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         logger.debug(f"ImageProcessor initialisé avec le cache: {self.cache}")
 
     def is_image_file(self, file_path: Path) -> bool:
@@ -85,9 +85,7 @@ class ImageProcessor:
         return self.output_dir / new_filename
 
     def process_image(
-        self, 
-        file_path: Path,
-        params: Optional[Dict[str, Any]] = None
+        self, file_path: Path, params: Optional[Dict[str, Any]] = None
     ) -> Optional[Tuple[Path, Path]]:
         """Traite une image unique.
 
@@ -106,13 +104,19 @@ class ImageProcessor:
         try:
             # Vérifier si l'image est déjà dans le cache
             new_path = self.output_dir / f"{file_path.stem}{file_path.suffix}"
-            
-            is_cached, cached_path = self.cache.is_cached(file_path, output_path=new_path, params=params, return_cached_path=True)
+
+            is_cached, cached_path = self.cache.is_cached(
+                file_path, output_path=new_path, params=params, return_cached_path=True
+            )
             if is_cached and cached_path:
                 logger.debug(f"Image déjà dans le cache: {file_path} -> {cached_path}")
                 return (file_path, cached_path)
-            elif is_cached:  # Cas où l'image est en cache mais pas de chemin retourné (ne devrait pas arriver)
-                logger.warning(f"Image marquée comme en cache mais pas de chemin retourné: {file_path}")
+            elif (
+                is_cached
+            ):  # Cas où l'image est en cache mais pas de chemin retourné (ne devrait pas arriver)
+                logger.warning(
+                    f"Image marquée comme en cache mais pas de chemin retourné: {file_path}"
+                )
                 return (file_path, new_path)
 
             # Créer un nouveau nom de fichier basé sur le hachage du fichier
@@ -122,20 +126,21 @@ class ImageProcessor:
 
             # Copier le fichier vers le nouveau chemin
             import shutil
+
             shutil.copy2(file_path, new_path)
-            
+
             # Ajouter au cache
             self.cache.add_to_cache(
-                source_path=file_path,
-                output_path=new_path,
-                params=params
+                source_path=file_path, output_path=new_path, params=params
             )
-            
+
             logger.info(f"Image traitée: {file_path.name} -> {new_path.name}")
             return (file_path, new_path)
 
         except Exception as e:
-            logger.error(f"Erreur lors du traitement de {file_path}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Erreur lors du traitement de {file_path}: {str(e)}", exc_info=True
+            )
             return None
 
     def process_directory(self) -> Iterator[Tuple[Path, Optional[Path]]]:

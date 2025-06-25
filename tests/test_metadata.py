@@ -99,7 +99,9 @@ def test_extract_and_save_metadata(sample_image: Path, temp_dir: Path):
     assert "content_hash" in metadata  # Le hachage de contenu doit être présent
 
     # Vérifier que le fichier de métadonnées a été créé avec le bon nom (basé sur le nom du fichier source)
-    expected_metadata_file = temp_dir / "metadata" / f"{sample_image.stem}_metadata.json"
+    expected_metadata_file = (
+        temp_dir / "metadata" / f"{sample_image.stem}_metadata.json"
+    )
     assert expected_metadata_file.exists()
 
     # Vérifier que le fichier contient les métadonnées attendues
@@ -143,7 +145,9 @@ def test_process_metadata_function(sample_image: Path, temp_dir: Path):
 
     # Vérifier qu'un fichier de métadonnées a été créé pour chaque image
     # (la déduplication n'est plus appliquée au niveau du nom de fichier)
-    assert len(metadata_files) == len(image_paths), f"Un fichier de métadonnées devrait être créé pour chaque image d'entrée (trouvé {len(metadata_files)}, attendu {len(image_paths)})"
+    assert len(metadata_files) == len(
+        image_paths
+    ), f"Un fichier de métadonnées devrait être créé pour chaque image d'entrée (trouvé {len(metadata_files)}, attendu {len(image_paths)})"
 
     # Vérifier que le fichier contient les métadonnées attendues
     with open(metadata_files[0], "r", encoding="utf-8") as f:

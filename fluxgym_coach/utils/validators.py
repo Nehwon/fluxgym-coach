@@ -27,9 +27,7 @@ def _validate_path_type(path_obj: Path, is_file: bool) -> None:
         return
 
     if is_file and not path_obj.is_file():
-        raise ValidationError(
-            f"Le chemin existe mais n'est pas un fichier: {path_obj}"
-        )
+        raise ValidationError(f"Le chemin existe mais n'est pas un fichier: {path_obj}")
 
     if not is_file and not path_obj.is_dir():
         raise ValidationError(
@@ -48,7 +46,8 @@ def _create_directory_if_needed(path_obj: Path, create_if_missing: bool) -> None
             ) from e
 
 
-T = TypeVar('T', str, Path)
+T = TypeVar("T", str, Path)
+
 
 def validate_path(
     path: Union[str, Path, None],
@@ -80,7 +79,7 @@ def validate_path(
         is_file = must_be_file
     elif must_be_dir is not None:
         is_file = not must_be_dir
-        
+
     path_obj = Path(str(path)).expanduser().resolve()
 
     if not must_exist and not create_if_missing:

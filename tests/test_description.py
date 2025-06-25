@@ -1,4 +1,5 @@
 """Tests pour le module description de Fluxgym-coach."""
+
 from pathlib import Path
 from unittest.mock import patch
 

@@ -51,29 +51,29 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         default="all",
         help="Type de traitement à effectuer (défaut: all)",
     )
-    
+
     # Options pour le cache
     cache_group = parser.add_argument_group("Options de cache")
     cache_group.add_argument(
         "--no-cache",
         action="store_true",
-        help="Désactive complètement l'utilisation du cache"
+        help="Désactive complètement l'utilisation du cache",
     )
     cache_group.add_argument(
         "--force-reprocess",
         action="store_true",
-        help="Force le retraitement de toutes les images, même si elles sont en cache"
+        help="Force le retraitement de toutes les images, même si elles sont en cache",
     )
     cache_group.add_argument(
         "--cache-dir",
         type=str,
         default=None,
-        help="Dossier personnalisé pour stocker le cache (par défaut: .fluxgym_cache dans le dossier utilisateur)"
+        help="Dossier personnalisé pour stocker le cache (par défaut: .fluxgym_cache dans le dossier utilisateur)",
     )
     cache_group.add_argument(
         "--clean-cache",
         action="store_true",
-        help="Nettoie le cache des entrées obsolètes avant le traitement"
+        help="Nettoie le cache des entrées obsolètes avant le traitement",
     )
 
     # Options pour l'amélioration d'image
@@ -176,32 +176,32 @@ def find_image_files(directory: Path) -> List[Path]:
 
 def setup_cache(args: argparse.Namespace) -> Optional[ImageCache]:
     """Configure et retourne une instance de cache selon les arguments.
-    
+
     Args:
         args: Arguments de la ligne de commande
-        
+
     Returns:
         Instance de ImageCache ou None si le cache est désactivé
     """
     if args.no_cache:
         logger.info("Cache désactivé (--no-cache)")
         return None
-        
+
     cache_dir = args.cache_dir
     if cache_dir:
         cache_dir = Path(cache_dir).expanduser().absolute()
         logger.debug(f"Utilisation du dossier de cache personnalisé: {cache_dir}")
-    
+
     try:
         cache = get_default_cache(cache_dir=cache_dir)
-        
+
         if args.clean_cache:
             logger.info("Nettoyage du cache...")
             cache.clean_old_entries()
-            
+
         if args.force_reprocess:
             logger.info("Mode force-reprocess activé, le cache sera ignoré")
-            
+
         return cache
     except Exception as e:
         logger.warning(f"Impossible d'initialiser le cache: {e}")
@@ -221,7 +221,7 @@ def main(args: Optional[Sequence[str]] = None) -> int:
     logging.basicConfig(handlers=[logging.NullHandler()])
 
     try:
-            # Convertir les arguments en liste si nécessaire
+        # Convertir les arguments en liste si nécessaire
         if args is None:
             args = sys.argv[1:]
         else:
@@ -229,7 +229,6 @@ def main(args: Optional[Sequence[str]] = None) -> int:
 
         # Parser les arguments
         parsed_args = parse_args(args)
-
 
         # Configurer le niveau de log en fonction du mode verbeux
         log_level = logging.DEBUG if parsed_args.verbose else logging.INFO
@@ -256,12 +255,10 @@ def main(args: Optional[Sequence[str]] = None) -> int:
         logger.info(f"Source: {input_dir}")
         logger.info(f"Destination: {output_dir}")
         logger.info(f"Type de traitement: {parsed_args.process}")
-        
+
         # Configurer le cache
         cache = setup_cache(parsed_args)
-        cache_params = {
-            'force_reprocess': parsed_args.force_reprocess
-        }
+        cache_params = {"force_reprocess": parsed_args.force_reprocess}
 
         # Trouver les fichiers image dans le dossier d'entrée
         image_files = find_image_files(input_dir)
@@ -273,89 +270,113 @@ def main(args: Optional[Sequence[str]] = None) -> int:
 
         # Initialiser la liste des fichiers traités
         processed_files = []
-        
+
         # Traitement des images (renommage et traitement complet) en premier
         if parsed_args.process in ["all", "rename"]:
             from fluxgym_coach.processor import ImageProcessor
-            
+
             # Créer une instance de ImageProcessor avec le cache configuré
             processor = ImageProcessor(
                 input_dir=input_dir,
                 output_dir=output_dir,
                 cache=cache,
-                cache_params=cache_params if cache else None
+                cache_params=cache_params if cache else None,
             )
-            
+
             # Traiter les images et récupérer les chemins des fichiers traités
             logger.debug("Début du traitement des images...")
             for original_path, new_path in processor.process_directory():
-                logger.debug(f"Image traitée - Original: {original_path}, Nouveau: {new_path}")
+                logger.debug(
+                    f"Image traitée - Original: {original_path}, Nouveau: {new_path}"
+                )
                 if new_path:  # Si le traitement a réussi
                     processed_files.append(new_path)  # Conserver l'objet Path
-            
-            action = "renommées et traitées" if parsed_args.process == "all" else "renommées"
+
+            action = (
+                "renommées et traitées" if parsed_args.process == "all" else "renommées"
+            )
             logger.info(
                 f"Traitement des images terminé. "
                 f"{len(processed_files)} images {action} avec succès."
             )
-            logger.debug(f"Liste des fichiers traités: {[str(p) for p in processed_files]}")
-            
+            logger.debug(
+                f"Liste des fichiers traités: {[str(p) for p in processed_files]}"
+            )
+
             # Mettre à jour la liste des fichiers pour les étapes suivantes
             image_files = processed_files
 
         # Traitement des métadonnées après le renommage
         if parsed_args.process in ["all", "metadata"]:
             from fluxgym_coach.metadata import process_metadata
-            
+
             # Activer les logs de débogage pour le module metadata
-            logging.getLogger('fluxgym_coach.metadata').setLevel(logging.DEBUG)
-            logger.debug(f"=== DÉBUT DU TRAITEMENT DES MÉTADONNÉES (mode: {parsed_args.process}) ===")
-            
+            logging.getLogger("fluxgym_coach.metadata").setLevel(logging.DEBUG)
+            logger.debug(
+                f"=== DÉBUT DU TRAITEMENT DES MÉTADONNÉES (mode: {parsed_args.process}) ==="
+            )
+
             # Déterminer les chemins des fichiers à traiter
             files_to_process = []
-            
+
             if parsed_args.process == "all" and processed_files:
                 # Mode "all" : utiliser les fichiers traités
-                logger.debug(f"Mode 'all' - Nombre de fichiers traités: {len(processed_files)}")
-                logger.debug(f"Contenu de processed_files: {[str(p) for p in processed_files]}")
-                
+                logger.debug(
+                    f"Mode 'all' - Nombre de fichiers traités: {len(processed_files)}"
+                )
+                logger.debug(
+                    f"Contenu de processed_files: {[str(p) for p in processed_files]}"
+                )
+
                 # Les fichiers sont déjà des objets Path, on s'assure juste qu'ils sont absolus
                 files_to_process = [p.resolve() for p in processed_files]
-                logger.debug(f"Fichiers à traiter (chemins absolus): {[str(p) for p in files_to_process]}")
+                logger.debug(
+                    f"Fichiers à traiter (chemins absolus): {[str(p) for p in files_to_process]}"
+                )
             else:
                 # Mode "metadata" : utiliser les fichiers du répertoire d'entrée
-                logger.debug(f"Mode 'metadata' - Recherche des images dans: {input_dir}")
-                for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
+                logger.debug(
+                    f"Mode 'metadata' - Recherche des images dans: {input_dir}"
+                )
+                for ext in ["*.jpg", "*.jpeg", "*.png", "*.webp"]:
                     files = list(input_dir.glob(ext))
                     logger.debug(f"Fichiers trouvés avec l'extension {ext}: {files}")
                     files_to_process.extend(files)
-                
+
                 # Si aucun fichier n'est trouvé dans l'entrée, vérifier la sortie
                 if not files_to_process:
-                    logger.debug(f"Aucun fichier trouvé dans {input_dir}, vérification de {output_dir}")
-                    for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
+                    logger.debug(
+                        f"Aucun fichier trouvé dans {input_dir}, vérification de {output_dir}"
+                    )
+                    for ext in ["*.jpg", "*.jpeg", "*.png", "*.webp"]:
                         files = list(output_dir.glob(ext))
-                        logger.debug(f"Fichiers trouvés dans la sortie avec l'extension {ext}: {files}")
+                        logger.debug(
+                            f"Fichiers trouvés dans la sortie avec l'extension {ext}: {files}"
+                        )
                         files_to_process.extend(files)
-            
+
             # Filtrer les fichiers existants
             existing_files = [p for p in files_to_process if p.exists()]
-            
+
             if not existing_files:
-                logger.warning("Aucun fichier valide trouvé pour le traitement des métadonnées")
+                logger.warning(
+                    "Aucun fichier valide trouvé pour le traitement des métadonnées"
+                )
             elif len(existing_files) < len(files_to_process):
                 missing = len(files_to_process) - len(existing_files)
-                logger.warning(f"{missing} fichiers introuvables pour le traitement des métadonnées")
-            
+                logger.warning(
+                    f"{missing} fichiers introuvables pour le traitement des métadonnées"
+                )
+
             logger.debug(f"Chemins complets des fichiers à traiter: {existing_files}")
-            
+
             if existing_files:
                 success_count = process_metadata(existing_files, output_dir)
                 logger.info(
                     f"Traitement des métadonnées terminé. "
                     f"{success_count}/{len(existing_files)} images traitées avec succès."
                 )
-                
+
                 # Vérifier si les fichiers de métadonnées ont été créés
                 metadata_dir = output_dir / "metadata"
                 if metadata_dir.exists():
@@ -364,7 +385,9 @@ def main(args: Optional[Sequence[str]] = None) -> int:
                     for f in metadata_files:
                         logger.debug(f"Taille de {f}: {f.stat().st_size} octets")
             else:
-                logger.warning("Aucun fichier valide trouvé pour le traitement des métadonnées")
+                logger.warning(
+                    "Aucun fichier valide trouvé pour le traitement des métadonnées"
+                )
 
         # Génération des descriptions
         if parsed_args.process in ["all", "description"]:
@@ -373,16 +396,16 @@ def main(args: Optional[Sequence[str]] = None) -> int:
                 f"Génération des descriptions terminée. "
                 f"{success_count}/{len(image_files)} descriptions générées avec succès."
             )
-            
+
         # Amélioration des images
         if parsed_args.process in ["all", "enhance"]:
             logger.info("Démarrage de l'amélioration des images...")
             enhancer = ImageEnhancer(api_url=parsed_args.api_url)
-            
+
             # Créer un sous-dossier pour les images améliorées
             enhanced_dir = output_dir / "enhanced"
             enhanced_dir.mkdir(exist_ok=True)
-            
+
             success_count = 0
             for img_path in image_files:
                 try:
@@ -399,8 +422,10 @@ def main(args: Optional[Sequence[str]] = None) -> int:
                     success_count += 1
                     logger.debug(f"Image améliorée : {img_path.name} -> {output_path}")
                 except Exception as e:
-                    logger.error(f"Erreur lors du traitement de {img_path.name}: {str(e)}")
-            
+                    logger.error(
+                        f"Erreur lors du traitement de {img_path.name}: {str(e)}"
+                    )
+
             logger.info(
                 f"Amélioration des images terminée. "
                 f"{success_count}/{len(image_files)} images améliorées avec succès."

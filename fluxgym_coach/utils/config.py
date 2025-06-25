@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, TypeVar, Union
 import logging
 
 # Type générique pour la méthode get
-T = TypeVar('T')
+T = TypeVar("T")
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -58,7 +58,13 @@ def get_default_config() -> dict:
         "processing": {
             "hash_algorithm": "sha256",
             "supported_extensions": [
-                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp"
+                "jpg",
+                "jpeg",
+                "png",
+                "gif",
+                "bmp",
+                "tiff",
+                "webp",
             ],
             "max_image_size_mb": 50,
         },
@@ -82,11 +88,12 @@ DEFAULT_CONFIG = get_default_config()
 
 class Config:
     """Classe de gestion de la configuration de l'application."""
-    _instance: Optional['Config'] = None
+
+    _instance: Optional["Config"] = None
     _config: Dict[str, Any]
     _initialized: bool
 
-    def __new__(cls) -> 'Config':
+    def __new__(cls) -> "Config":
         """Implémentation du pattern Singleton."""
         if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
@@ -95,7 +102,7 @@ class Config:
 
     def __init__(self) -> None:
         """Initialise la configuration."""
-        if hasattr(self, '_initialized') and self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             return
 
         self._config = {}
@@ -123,7 +130,7 @@ class Config:
         # Si le fichier de configuration existe, le charger
         if config_file.exists():
             try:
-                with open(config_file, 'r', encoding='utf-8') as f:
+                with open(config_file, "r", encoding="utf-8") as f:
                     user_config = json.load(f)
                     if not isinstance(user_config, dict):
                         logger.error(
@@ -136,13 +143,9 @@ class Config:
                     logger.info(f"Configuration chargée depuis {config_file}")
                     return True
             except json.JSONDecodeError as e:
-                logger.error(
-                    f"Erreur de décodage JSON dans {config_file}: {str(e)}"
-                )
+                logger.error(f"Erreur de décodage JSON dans {config_file}: {str(e)}")
             except Exception as e:
-                logger.error(
-                    f"Erreur lors du chargement de {config_file}: {str(e)}"
-                )
+                logger.error(f"Erreur lors du chargement de {config_file}: {str(e)}")
             # En cas d'erreur, charger la configuration par défaut
             self._config = self._deep_copy_config(DEFAULT_CONFIG)
             return False
@@ -168,16 +171,14 @@ class Config:
             config_dir = config_file.parent
             config_dir.mkdir(parents=True, exist_ok=True)
 
-            with open(config_file, 'w', encoding='utf-8') as f:
+            with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=2, ensure_ascii=False)
 
             logger.debug(f"Configuration sauvegardée dans {config_file}")
             return True
 
         except Exception as e:
-            logger.error(
-                f"Erreur lors de la sauvegarde de {config_file}: {str(e)}"
-            )
+            logger.error(f"Erreur lors de la sauvegarde de {config_file}: {str(e)}")
             return False
 
     def get(self, key: str, default: Optional[T] = None) -> Union[Any, Optional[T]]:
@@ -195,7 +196,7 @@ class Config:
             >>> config = Config()
             >>> version = config.get('app.version', '0.0.0')
         """
-        keys = key.split('.')
+        keys = key.split(".")
         value: Any = self._config
 
         try:
@@ -222,7 +223,7 @@ class Config:
             >>> config.set('app.version', '1.0.0')
             True
         """
-        keys = key.split('.')
+        keys = key.split(".")
         current: Dict[str, Any] = self._config
 
         try:

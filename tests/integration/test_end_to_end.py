@@ -21,7 +21,14 @@ def test_end_to_end_processing(tmp_path: Path, sample_image: Path):
     # Exécuter la commande CLI en mode verbeux
     with patch(
         "sys.argv",
-        ["fluxgym-coach", "--input", str(input_dir), "--output", str(output_dir), "--verbose"],
+        [
+            "fluxgym-coach",
+            "--input",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+            "--verbose",
+        ],
     ):
         result = cli_main()
 
