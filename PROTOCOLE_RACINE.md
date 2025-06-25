@@ -1,48 +1,176 @@
 # Fluxgym-coach Development Protocol
 
+> **Note**: This document is also available in [French](PROTOCOLE_RACINE.fr.md).
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 ## Table of Contents
 1. [Communication](#1-communication)
 2. [Technical Standards](#2-technical-standards)
 3. [Version Control](#3-version-control)
-4. [Docker and Containerization](#4-docker-and-containerization)
-5. [Development Best Practices](#5-development-best-practices)
+4. [Development Workflow](#4-development-workflow)
+5. [Code Quality](#5-code-quality)
 6. [Documentation](#6-documentation)
-7. [Troubleshooting](#7-troubleshooting)
+7. [Security](#7-security)
 8. [Project Specifics](#8-project-specifics)
 
 ## 1. Communication
 
 ### General Principles
 - **Language**: English (except for code and technical identifiers)
-- **Style**: Professional yet casual
+- **Style**: Professional yet approachable
 - **Update Frequency**: Continuous, throughout development
+- **Time Zone**: UTC+1 (Paris) is the reference timezone
 
 ### Recommended Tools
-- Task Tracking: Gitea Issues or equivalent
-- Asynchronous Communication: Email or team messaging tool
-- Meetings: Shared calendar with predefined agenda
+- **Task Tracking**: [GitHub Issues](https://github.com/Nehwon/fluxgym-coach/issues)
+- **Code Review**: GitHub Pull Requests
+- **Documentation**: Markdown in repository
+- **Communication**: Asynchronous first, with clear documentation
 
 ### Communication Rules
-- Always mention project context
-- Use clear references to tickets or issues
+- Always provide context in issue descriptions
+- Reference related issues/PRs using `#issue_number`
 - Document important decisions in `DECISIONS.md`
+- Keep discussions focused and actionable
+- Use clear, descriptive titles for issues and PRs
 
 ## 2. Technical Standards
 
-### Languages and Frameworks
-- **Python**: PEP 8, static typing with mypy
-- **JavaScript/TypeScript**: ESLint, Prettier
-- **Other Languages**: Follow community standards
+### Core Technologies
+- **Python**: 3.8+
+- **Image Processing**: Pillow, OpenCV
+- **API**: REST with FastAPI
+- **Caching**: Custom implementation with file-based storage
 
-### Code Quality
-- Unit tests with minimum 80% coverage
-- Mandatory code review before merging (Pull Request)
-- Continuous integration with test and linting verification
+### Development Environment
+- **Python Version**: 3.8+ (see `.python-version`)
+- **Package Management**: `pip` with `requirements.txt` and `setup.py`
+- **Virtual Environment**: Recommended (venv, pipenv, or conda)
+- **Linting**: flake8, black, mypy
+- **Testing**: pytest with coverage
 
-### Security
-- Never store sensitive data in plain text in code
-- Use environment variables for sensitive configurations
-- Regularly update dependencies to fix known vulnerabilities
+### Dependencies
+- Keep dependencies to a minimum
+- Document all dependencies in `requirements.txt`
+- Pin production dependencies in `setup.py`
+- Use `requirements-dev.txt` for development dependencies
+
+## 3. Version Control
+
+### Branching Strategy
+- `main`: Production-ready code
+- `develop`: Integration branch for features
+- `feature/*`: New features and enhancements
+- `bugfix/*`: Bug fixes
+- `hotfix/*`: Critical production fixes
+
+### Commit Guidelines
+- Follow [Conventional Commits](https://www.conventionalcommits.org/)
+- Use the present tense ("Add feature" not "Added feature")
+- Keep commits atomic and focused
+- Reference issues in commit messages (e.g., `#123`)
+
+### Pull Requests
+- Keep PRs small and focused
+- Include relevant tests
+- Update documentation as needed
+- Request reviews from at least one maintainer
+- All tests must pass before merging
+
+## 4. Development Workflow
+
+### Getting Started
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes
+4. Run tests: `pytest`
+5. Commit your changes: `git commit -m 'feat: add amazing feature'`
+6. Push to the branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Code Review Process
+1. Create a draft PR early for feedback
+2. Request reviews from relevant team members
+3. Address all review comments
+4. Ensure CI checks pass
+5. Get at least one approval before merging
+
+## 5. Code Quality
+
+### Testing
+- Write unit tests for all new code
+- Aim for at least 80% test coverage
+- Use fixtures and parametrized tests when appropriate
+- Run tests locally before pushing
+
+### Linting and Formatting
+- Use `black` for code formatting
+- Run `flake8` for static analysis
+- Use `mypy` for type checking
+- Pre-commit hooks are recommended
+
+### Performance
+- Profile code before optimizing
+- Document performance considerations
+- Use appropriate data structures
+- Consider memory usage for large image processing
+
+## 6. Documentation
+
+### Code Documentation
+- Follow Google-style docstrings
+- Document all public APIs
+- Include type hints for all function signatures
+- Document exceptions that may be raised
+
+### Project Documentation
+- Keep `README.md` up to date
+- Document architecture decisions in `DECISIONS.md`
+- Update `CHANGELOG.md` for each release
+- Document environment variables in `.env.example`
+
+## 7. Security
+
+### General Principles
+- Never commit sensitive data
+- Use environment variables for configuration
+- Keep dependencies up to date
+- Follow the principle of least privilege
+
+### Authentication
+- Use secure token-based authentication
+- Implement proper session management
+- Validate all user inputs
+- Sanitize outputs to prevent XSS
+
+### Dependencies
+- Regularly audit dependencies for vulnerabilities
+- Use Dependabot or similar tools
+- Pin all dependencies to specific versions
+- Document security-related dependencies
+
+## 8. Project Specifics
+
+### Image Processing
+- Support common image formats (PNG, JPEG, WEBP)
+- Handle large images efficiently
+- Implement proper error handling for malformed images
+- Document memory requirements
+
+### Caching
+- Use consistent cache keys
+- Implement cache invalidation
+- Document cache behavior
+- Consider cache size limits
+
+### Error Handling
+- Use appropriate exception types
+- Provide helpful error messages
+- Log errors with sufficient context
+- Implement graceful degradation
 
 ## 3. Version Control
 

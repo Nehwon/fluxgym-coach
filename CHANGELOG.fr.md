@@ -5,6 +5,21 @@ Tous les changements notables de ce projet seront documentés dans ce fichier.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Non publié]
+
+### Ajouté
+- **Documentation** :
+  - Mise à jour complète de tous les fichiers de documentation
+  - Amélioration du README avec une meilleure structure et des instructions d'installation
+  - Ajout des directives de contribution et de l'état du projet
+  - Documentation des modules améliorée
+
+### Modifié
+- **Qualité du code** :
+  - Amélioration des messages d'erreur et des journaux
+  - Meilleure utilisation des annotations de type
+  - Mise à jour des dépendances de développement
+
 ## [0.2.1] - 2024-06-24
 
 ### Corrigé

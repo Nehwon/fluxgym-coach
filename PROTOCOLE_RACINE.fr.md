@@ -1,48 +1,176 @@
 # Protocole de Développement Fluxgym-coach
 
+> **Note** : Ce document est également disponible en [anglais](PROTOCOLE_RACINE.md).
+
+[![Licence : GPL v3](https://img.shields.io/badge/Licence-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Style de code : black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 ## Table des matières
 1. [Communication](#1-communication)
 2. [Standards Techniques](#2-standards-techniques)
 3. [Gestion de Version](#3-gestion-de-version)
-4. [Docker et Conteneurisation](#4-docker-et-conteneurisation)
-5. [Bonnes Pratiques de Développement](#5-bonnes-pratiques-de-développement)
+4. [Workflow de Développement](#4-workflow-de-développement)
+5. [Qualité du Code](#5-qualité-du-code)
 6. [Documentation](#6-documentation)
-7. [Dépannage](#7-dépannage)
+7. [Sécurité](#7-sécurité)
 8. [Spécificités du Projet](#8-spécificités-du-projet)
 
 ## 1. Communication
 
 ### Principes généraux
 - **Langue** : Français (sauf pour le code et les identifiants techniques)
-- **Style** : Professionnel mais décontracté
-- **Fréquence des mises à jour** : Continue, au fil du développement
+- **Style** : Professionnel mais accessible
+- **Fréquence des mises à jour** : Continue, tout au long du développement
+- **Fuseau horaire** : UTC+1 (Paris) est le fuseau horaire de référence
 
 ### Outils recommandés
-- Suivi des tâches : Gitea Issues ou équivalent
-- Communication asynchrone : Email ou outil de messagerie d'équipe
-- Réunions : Agenda partagé avec ordre du jour défini à l'avance
+- **Suivi des tâches** : [GitHub Issues](https://github.com/Nehwon/fluxgym-coach/issues)
+- **Revue de code** : GitHub Pull Requests
+- **Documentation** : Markdown dans le dépôt
+- **Communication** : Asynchrone en priorité, avec une documentation claire
 
 ### Règles de communication
-- Toujours mentionner le contexte du projet
-- Utiliser des références claires aux tickets ou problèmes
-- Documenter les décisions importantes dans le fichier `DECISIONS.md`
+- Toujours fournir le contexte dans les descriptions de problèmes
+- Référencer les problèmes/PRs associés avec `#numéro_du_problème`
+- Documenter les décisions importantes dans `DECISIONS.md`
+- Maintenir les discussions ciblées et actionnables
+- Utiliser des titres clairs et descriptifs pour les problèmes et PRs
 
 ## 2. Standards Techniques
 
-### Langages et Frameworks
-- **Python** : PEP 8, typage statique avec mypy
-- **JavaScript/TypeScript** : ESLint, Prettier
-- **Autres langages** : Suivre les conventions standards de la communauté
+### Technologies principales
+- **Python** : 3.8+
+- **Traitement d'images** : Pillow, OpenCV
+- **API** : REST avec FastAPI
+- **Cache** : Implémentation personnalisée avec stockage basé sur les fichiers
 
-### Qualité du code
-- Tests unitaires avec une couverture minimale de 80%
-- Revue de code obligatoire avant fusion (Pull Request)
-- Intégration continue avec vérification des tests et du linting
+### Environnement de développement
+- **Version de Python** : 3.8+ (voir `.python-version`)
+- **Gestion des paquets** : `pip` avec `requirements.txt` et `setup.py`
+- **Environnement virtuel** : Recommandé (venv, pipenv, ou conda)
+- **Vérification du code** : flake8, black, mypy
+- **Tests** : pytest avec couverture de code
 
-### Sécurité
-- Ne jamais stocker de données sensibles en clair dans le code
-- Utiliser des variables d'environnement pour les configurations sensibles
-- Mettre à jour régulièrement les dépendances pour corriger les vulnérabilités connues
+### Dépendances
+- Maintenir le nombre de dépendances au minimum
+- Documenter toutes les dépendances dans `requirements.txt`
+- Épingler les dépendances de production dans `setup.py`
+- Utiliser `requirements-dev.txt` pour les dépendances de développement
+
+## 3. Gestion de Version
+
+### Stratégie de branches
+- `main` : Code prêt pour la production
+- `develop` : Branche d'intégration pour les fonctionnalités
+- `feature/*` : Nouvelles fonctionnalités et améliorations
+- `bugfix/*` : Corrections de bugs
+- `hotfix/*` : Corrections critiques pour la production
+
+### Directives de commit
+- Suivre les [Conventional Commits](https://www.conventionalcommits.org/)
+- Utiliser le présent ("Ajoute une fonctionnalité" et non "Ajout d'une fonctionnalité")
+- Faire des commits atomiques et ciblés
+- Référencer les problèmes dans les messages de commit (ex: `#123`)
+
+### Pull Requests
+- Garder les PR petites et ciblées
+- Inclure les tests pertinents
+- Mettre à jour la documentation si nécessaire
+- Demander des relectures à au moins un mainteneur
+- Tous les tests doivent passer avant la fusion
+
+## 4. Workflow de Développement
+
+### Pour commencer
+1. Forker le dépôt
+2. Créer une branche de fonctionnalité : `git checkout -b feature/nouvelle-fonctionnalite`
+3. Effectuer vos modifications
+4. Exécuter les tests : `pytest`
+5. Committer vos modifications : `git commit -m 'feat: ajoute une nouvelle fonctionnalité'`
+6. Pousser vers la branche : `git push origin feature/nouvelle-fonctionnalite`
+7. Ouvrir une Pull Request
+
+### Processus de revue de code
+1. Créer une PR brouillon tôt pour obtenir des retours
+2. Demander des relectures aux membres pertinents de l'équipe
+3. Adresser tous les commentaires de revue
+4. S'assurer que tous les tests CI passent
+5. Obtenir au moins une approbation avant la fusion
+
+## 5. Qualité du Code
+
+### Tests
+- Écrire des tests unitaires pour tout nouveau code
+- Viser au moins 80% de couverture de test
+- Utiliser des fixtures et des tests paramétrés quand c'est approprié
+- Exécuter les tests localement avant de pousser
+
+### Vérification et formatage
+- Utiliser `black` pour le formatage du code
+- Exécuter `flake8` pour l'analyse statique
+- Utiliser `mypy` pour la vérification des types
+- Les hooks de pre-commit sont recommandés
+
+### Performance
+- Profiler le code avant d'optimiser
+- Documenter les considérations de performance
+- Utiliser des structures de données appropriées
+- Prendre en compte l'utilisation de la mémoire pour le traitement d'images volumineux
+
+## 6. Documentation
+
+### Documentation du code
+- Suivre les docstrings au format Google
+- Documenter toutes les API publiques
+- Inclure des indications de type pour toutes les signatures de fonction
+- Documenter les exceptions qui peuvent être levées
+
+### Documentation du projet
+- Maintenir `README.md` à jour
+- Documenter les décisions d'architecture dans `DECISIONS.md`
+- Mettre à jour `CHANGELOG.md` pour chaque version
+- Documenter les variables d'environnement dans `.env.example`
+
+## 7. Sécurité
+
+### Principes généraux
+- Ne jamais commettre de données sensibles
+- Utiliser des variables d'environnement pour la configuration
+- Maintenir les dépendances à jour
+- Suivre le principe du moindre privilège
+
+### Authentification
+- Utiliser une authentification par jeton sécurisée
+- Implémenter une gestion de session appropriée
+- Valider toutes les entrées utilisateur
+- Nettoyer les sorties pour prévenir les attaques XSS
+
+### Dépendances
+- Auditer régulièrement les dépendances pour les vulnérabilités
+- Utiliser Dependabot ou des outils similaires
+- Épingler toutes les dépendances à des versions spécifiques
+- Documenter les dépendances liées à la sécurité
+
+## 8. Spécificités du Projet
+
+### Traitement d'images
+- Supporter les formats d'image courants (PNG, JPEG, WEBP)
+- Gérer efficacement les images volumineuses
+- Implémenter une gestion d'erreur appropriée pour les images corrompues
+- Documenter les besoins en mémoire
+
+### Mise en cache
+- Utiliser des clés de cache cohérentes
+- Implémenter une invalidation du cache
+- Documenter le comportement du cache
+- Prendre en compte les limites de taille du cache
+
+### Gestion des erreurs
+- Utiliser des types d'exception appropriés
+- Fournir des messages d'erreur utiles
+- Journaliser les erreurs avec suffisamment de contexte
+- Implémenter une dégradation gracieuse
 
 ## 3. Gestion de Version
 

@@ -4,50 +4,49 @@
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Tests](https://img.shields.io/badge/tests-100%25-success)](https://github.com/psf/black)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/Nehwon/fluxgym-coach/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue)](https://github.com/Nehwon/fluxgym-coach/releases/tag/v0.2.1)
+[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://github.com/Nehwon/fluxgym-coach/tree/main/docs)
 
-Assistant de préparation de datasets d'images pour Fluxgym
+Outil de préparation et d'amélioration de jeux de données d'images pour Fluxgym avec suréchantillonnage par IA et traitement par lots.
 
-## 📋 Description
+## 🌍 Documentation disponible
 
-Fluxgym-coach est un outil puissant conçu pour faciliter la préparation et l'optimisation des ensembles de données d'images pour Fluxgym. Il automatise les tâches courantes de traitement d'images, offrant des fonctionnalités avancées d'amélioration, de gestion de cache et de traitement par lots.
+- [Documentation en français](README.fr.md) (actuelle)
+- [English Documentation](README.en.md)
+- [Journal des modifications](CHANGELOG.fr.md) / [Changelog](CHANGELOG.md)
+- [État du Projet](ETAT_DU_PROJET.md) / [Project Status](PROJECT_STATUS.md)
+- [Protocole de Développement](PROTOCOLE_RACINE.fr.md) / [Development Protocol](PROTOCOLE_RACINE.md)
 
-Avec son système de cache intelligent, Fluxgym-coach optimise les performances en évitant les retraitements inutiles, tout en offrant une grande flexibilité grâce à son interface en ligne de commande complète.
+## 🚀 Fonctionnalités
 
-## ✨ Fonctionnalités clés
+- **Amélioration d'images par IA**
+  - Suréchantillonnage de haute qualité avec Stable Diffusion Forge
+  - Traitement par lots de plusieurs images
+  - Détection et colorisation automatique des images en noir et blanc
+  - Système de cache intelligent pour des performances optimalisées
 
-### 🚀 Amélioration d'images
-- **Traitement par lots** : Traitement efficace de plusieurs images en une seule opération
-- **Upscaling intelligent** : Augmentation de la résolution jusqu'à 4x
-- **Colorisation automatique** : Détection et colorisation des images en noir et blanc
-- **Détection automatique N&B** : Identification intelligente des images en niveaux de gris
-- **Conversion de format** : Support des formats PNG, JPG, WebP et plus
-- **Redimensionnement proportionnel** : Conservation des rapports d'aspect
+- **Traitement avancé**
+  - Support de plusieurs formats d'images (PNG, JPEG, WEBP)
+  - Paramètres de suréchantillonnage configurables
+  - Gestion granulaire des erreurs
+  - Journalisation détaillée de la progression
 
-### ⚡ Optimisation des performances
-- **Système de cache intelligent** : Évite le retraitement inutile
-  - Vérification des empreintes de fichiers avec `xxhash`
-  - Prise en compte des paramètres de traitement dans la clé de cache
-  - Nettoyage automatique des entrées invalides
-  - Cache persistant sur le disque entre les sessions
-  - Statistiques d'utilisation du cache
+- **Conçu pour les développeurs**
+  - Annotations de type dans tout le code
+  - Suite de tests complète
+  - Style de code propre et cohérent
+  - Documentation API détaillée
 
-### 🛠️ Options de ligne de commande
-- `--no-cache` : Désactive complètement le cache
-- `--force-reprocess` : Force le retraitement de toutes les images
-- `--cache-dir` : Spécifie un répertoire personnalisé pour le cache
-- `--clean-cache` : Nettoie le cache avant l'exécution
-- `--verbose` : Active les journaux détaillés
+## 📦 Prérequis
 
-### 📊 Outils de développement
-- Script de benchmark intégré pour mesurer les performances
-- Génération d'images de test pour les benchmarks
-- Statistiques détaillées (moyenne, min, max, écart-type)
-
-- **Tests unitaires complets**
-  - Couverture de test pour le module d'amélioration d'images
-  - Tests d'intégration avec l'API Stable Diffusion Forge
-  - Vérification des types avec mypy pour une meilleure qualité de code
+- Python 3.8 ou supérieur
+- Serveur Stable Diffusion WebUI Forge (pour l'amélioration d'images)
+- Bibliothèques Python requises (voir `setup.py` pour la liste complète) :
+  - `requests` : Pour les requêtes HTTP
+  - `Pillow` : Pour le traitement d'images
+  - `python-multipart` : Pour le téléversement de fichiers
+  - `xxhash` : Pour l'empreinte rapide des fichiers
+  - `tqdm` : Pour les barres de progression
 - **Déduplication intelligente** : Détection et gestion des images en double basée sur le hachage de contenu
 - **Extraction complète des métadonnées** : Récupération des données EXIF et autres métadonnées techniques
 - **Renommage sécurisé** : Utilisation de hachages uniques pour éviter les conflits de noms

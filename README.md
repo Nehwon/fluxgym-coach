@@ -5,36 +5,61 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Tests](https://img.shields.io/badge/tests-100%25-success)](https://github.com/psf/black)
 [![Version](https://img.shields.io/badge/version-0.2.1-blue)](https://github.com/Nehwon/fluxgym-coach/releases/tag/v0.2.1)
+[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://github.com/Nehwon/fluxgym-coach/tree/main/docs)
 
-Image dataset preparation assistant for Fluxgym
+Image dataset preparation and enhancement tool for Fluxgym with AI-powered upscaling and batch processing.
 
-## 📋 Available Documentation
+## 🌍 Available Documentation
 
 - [English Documentation](README.en.md)
 - [Documentation en français](README.fr.md)
+- [Changelog](CHANGELOG.md) / [Journal des modifications](CHANGELOG.fr.md)
+- [Project Status](PROJECT_STATUS.md) / [État du Projet](ETAT_DU_PROJET.md)
+- [Development Protocol](PROTOCOLE_RACINE.md) / [Protocole de Développement](PROTOCOLE_RACINE.fr.md)
 
-## ℹ️ About
+## 🚀 Features
 
-Fluxgym-coach is a powerful tool designed to facilitate the preparation and optimization of image datasets for Fluxgym. It automates common image processing tasks, offering advanced enhancement features, cache management, and batch processing capabilities.
-- `requests`: HTTP requests
-- `python-multipart`: File uploads
-- `xxhash`: Fast fingerprinting
+- **AI-Powered Image Enhancement**
+  - High-quality upscaling using Stable Diffusion Forge
+  - Batch processing for multiple images
+  - Automatic black & white detection and colorization
+  - Smart caching system for improved performance
 
-### Development
-- `pytest`: Test execution
-- `black`: Code formatting
-- `mypy`: Type checking
-- `pytest-cov`: Test coverage
-- `pytest-httpx`: HTTP request mocking for tests
-- `codecov`: Code coverage reporting
+- **Advanced Processing**
+  - Support for multiple image formats (PNG, JPEG, WEBP)
+  - Configurable upscaling parameters
+  - Granular error handling
+  - Detailed progress logging
 
-> **Note**: For image enhancement, a running Stable Diffusion WebUI Forge server is required.
+- **Developer Friendly**
+  - Type hints throughout the codebase
+  - Comprehensive test suite
+  - Clean and consistent code style
+  - Detailed API documentation
+
+## 📦 Prerequisites
+
+- Python 3.8 or higher
+- Stable Diffusion WebUI Forge server (for image enhancement)
+- Required Python packages (see `setup.py` for complete list):
+  - `requests`: For HTTP requests
+  - `Pillow`: For image processing
+  - `python-multipart`: For file uploads
+  - `xxhash`: For fast file fingerprinting
+  - `tqdm`: For progress bars
+
+## 🛠️ Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Nehwon/fluxgym-coach.git
+cd fluxgym-coach
+
+# Install in development mode with all dependencies
+pip install -e ".[dev]"
+```
 
 ## 🧪 Running Tests
-
-### Unit Tests
-
-To run the test suite:
 
 ```bash
 # Install test dependencies
@@ -48,6 +73,49 @@ pytest --cov=fluxgym_coach --cov-report=term-missing
 
 # Run type checking
 mypy .
+```
+
+## 📚 Documentation
+
+### Project Structure
+
+```
+fluxgym-coach/
+├── docs/                    # Documentation files
+│   ├── releases/           # Release notes
+│   └── image_enhancement.md # Module documentation
+├── fluxgym_coach/          # Main package
+│   ├── __init__.py
+│   ├── image_enhancement.py # Core enhancement logic
+│   └── utils/              # Utility modules
+├── tests/                  # Test files
+├── CHANGELOG.md            # English changelog
+├── CHANGELOG.fr.md         # French changelog
+├── README.md               # This file
+└── setup.py                # Package configuration
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contribution Guidelines](PROTOCOLE_RACINE.md#contribution-guidelines) before submitting pull requests.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📜 License
+
+This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+## 📞 Contact
+
+For questions or support, please open an issue on GitHub.
+
+---
+
+*© 2024 Fluxgym Team - All Rights Reserved*
 ```
 
 ### Integration Tests
