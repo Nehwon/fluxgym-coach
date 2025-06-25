@@ -183,15 +183,26 @@ def test_enhance_image_function(temp_image, tmp_path):
     with patch(
         "fluxgym_coach.image_enhancement.ImageEnhancer.upscale_image"
     ) as mock_upscale:
-        expected_result = (output_path, False)
+        # Le résultat attendu est un tuple (chemin_sortie, est_nb)
+        expected_result = (str(output_path), False)
         mock_upscale.return_value = expected_result
 
+        # Appeler la fonction avec les paramètres de test
         result = enhance_image(
             image_path=temp_image, output_path=output_path, api_url="http://mock-api"
         )
 
-        assert result == expected_result
+        # Vérifier que le résultat est bien un tuple (chemin, bool)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], (str, Path))
+        assert isinstance(result[1], bool)
+        
+        # Vérifier que upscale_image a été appelé avec les bons paramètres
         mock_upscale.assert_called_once()
+        
+        # Vérifier que le résultat correspond à ce qui est attendu
+        assert result == expected_result
 
 
 def test_preprocess_image_basic(tmp_path):
@@ -719,12 +730,30 @@ def test_upscale_batch_multiple_images(temp_image, tmp_path, monkeypatch):
         if endpoint == "sdapi/v1/extra-batch-images":
             # Vérifier que nous avons le bon endpoint
             assert "imageList" in payload
-            # Retourner une réponse factice avec deux images
+            
+            # Créer une image factice en mémoire
+            from PIL import Image, ImageDraw
+            import io
+            import base64
+            
+            # Liste pour stocker les images encodées
+            encoded_images = []
+            
+            # Générer une image factice différente pour chaque entrée
+            for i in range(len(payload["imageList"])):
+                # Créer une image avec une couleur différente pour chaque entrée
+                img = Image.new('RGB', (100, 100), color=(i * 50 % 255, 100, 150))
+                draw = ImageDraw.Draw(img)
+                draw.text((10, 10), f"Test Image {i+1}", fill=(255, 255, 255))
+                
+                # Convertir en base64
+                buffered = io.BytesIO()
+                img.save(buffered, format="PNG")
+                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                encoded_images.append(img_str)
+            
             return {
-                "images": [
-                    base64.b64encode(f"fake_image_data_{i+1}".encode()).decode("utf-8") 
-                    for i in range(len(payload["imageList"]))
-                ],
+                "images": encoded_images,
                 "parameters": {},
             }
         elif endpoint == "sdapi/v1/img2img":

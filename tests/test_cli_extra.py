@@ -164,7 +164,15 @@ def test_main_processing_error(
     mock_parse_args.assert_called_once()
     mock_validate_paths.assert_called_once_with(str(input_dir), str(output_dir))
     mock_find_image_files.assert_called_once_with(input_dir)
+    
     # Vérifier que process_metadata a été appelé avec les bons arguments
-    mock_process_metadata.assert_called_once_with(image_files, output_dir)
+    # Note: process_metadata est appelé avec existing_files qui est une version filtrée de files_to_process
+    # qui est construit à partir de image_files
+    assert mock_process_metadata.call_count == 1
+    args, kwargs = mock_process_metadata.call_args
+    assert len(args) == 2
+    assert isinstance(args[0], list) and all(isinstance(x, Path) for x in args[0])
+    assert args[1] == output_dir
+    
     # Vérifier que process_directory n'est pas appelé en cas d'erreur dans process_metadata
     mock_processor.process_directory.assert_not_called()

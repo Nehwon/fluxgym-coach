@@ -1,27 +1,29 @@
 """
 Module pour l'amélioration d'images avec Stable Diffusion Forge.
-Permet d'augmenter la résolution des images via une API Stable Diffusion.
+Permet d'augmenter la résolution et d'améliorer la qualité des images.
 """
 
 import base64
+import datetime
 import io
 import json
 import logging
+import os
 import random
+import string
+import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, List, BinaryIO
+from typing import Any, Dict, List, Optional, Tuple, Union, cast, Set
 from urllib.error import URLError
-from io import BytesIO
 
 import requests
-from PIL import Image, ImageFile
+from PIL import Image, ImageFilter, ImageOps, Image as PILImage
+
+from .image_cache import ImageCache, get_default_cache
 
 # Configuration du logger
 logger = logging.getLogger(__name__)
-
-# Activer le chargement partiel des images pour les gros fichiers
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Constantes pour la compatibilité avec différentes versions de Pillow
 try:
@@ -33,13 +35,14 @@ except AttributeError:
 MIN_WIDTH = 1024  # Largeur minimale pour le redimensionnement
 SUPPORTED_FORMATS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
 
+
 class ImageEnhancer:
-    """Classe pour améliorer la résolution des images via l'API Stable Diffusion Forge."""
+    """Classe pour améliorer des images via l'API Stable Diffusion Forge."""
 
     def __init__(
         self,
         api_url: str = "http://127.0.0.1:7860",
-        cache: Optional[Any] = None,
+        cache: Optional[ImageCache] = None,
         use_cache: bool = True,
     ):
         """
@@ -47,156 +50,16 @@ class ImageEnhancer:
 
         Args:
             api_url: URL de l'API Stable Diffusion WebUI (par défaut: http://127.0.0.1:7860)
-            cache: Instance de cache à utiliser (par défaut: instance partagée)
+            cache: Instance de ImageCache à utiliser (par défaut: instance partagée)
             use_cache: Si False, désactive complètement le cache
         """
         self.api_url = api_url.rstrip("/")
         self.timeout = 300  # 5 minutes de timeout pour les requêtes
         self.use_cache = use_cache
-        self.cache = cache if cache is not None else None
-        self._processed_paths = set()  # Pour éviter les doublons dans un même traitement
-        self.timeout = 300  # 5 minutes de timeout pour les requêtes
-
-    def _validate_image_path(self, image_path: Union[str, Path]) -> Path:
-        """
-        Valide le chemin de l'image et retourne un objet Path.
-        
-        Args:
-            image_path: Chemin vers le fichier image
-            
-        Returns:
-            Path: Objet Path du fichier image
-            
-        Raises:
-            FileNotFoundError: Si le fichier n'existe pas
-            ValueError: Si le format du fichier n'est pas supporté
-        """
-        path = Path(image_path).resolve()
-        
-        if not path.exists():
-            raise FileNotFoundError(f"Le fichier {path} n'existe pas")
-            
-        if path.suffix.lower() not in SUPPORTED_FORMATS:
-            raise ValueError(
-                f"Format de fichier non supporté: {path.suffix}. "
-                f"Formats supportés: {', '.join(SUPPORTED_FORMATS)}"
-            )
-            
-        return path
-        
-    def _ensure_output_dir(self, output_path: Union[str, Path]) -> Path:
-        """
-        Crée le répertoire de sortie s'il n'existe pas.
-        
-        Args:
-            output_path: Chemin du fichier de sortie
-            
-        Returns:
-            Path: Chemin du fichier de sortie
-        """
-        path = Path(output_path).resolve()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        return path
-        
-    def _generate_output_filename(
-        self, 
-        input_path: Union[str, Path],
-        suffix: str = "enhanced"
-    ) -> str:
-        """
-        Génère un nom de fichier de sortie unique.
-        
-        Args:
-            input_path: Chemin du fichier d'entrée
-            suffix: Suffixe à ajouter au nom du fichier
-            
-        Returns:
-            str: Nom de fichier unique avec horodatage
-        """
-        input_path = Path(input_path)
-        timestamp = int(time.time())
-        random_str = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=6))
-        return f"{input_path.stem}_{suffix}_{timestamp}_{random_str}{input_path.suffix}"
-        
-    def preprocess_image(self, image: Image.Image) -> Image.Image:
-        """
-        Prétraite une image avant l'upscaling.
-        
-        Args:
-            image: Image à prétraiter
-            
-        Returns:
-            Image prétraitée
-        """
-        # Convertir en RGB si nécessaire
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-            
-        # Redimensionner si nécessaire
-        if image.width < MIN_WIDTH:
-            ratio = MIN_WIDTH / image.width
-            new_height = int(image.height * ratio)
-            image = image.resize((MIN_WIDTH, new_height), RESAMPLING)
-            
-        return image
-        
-    def encode_image(self, image: Image.Image, format: str = 'PNG') -> str:
-        """
-        Encode une image PIL en base64.
-        
-        Args:
-            image: Image à encoder
-            format: Format de sortie (PNG par défaut)
-            
-        Returns:
-            Chaîne encodée en base64
-        """
-        buffered = BytesIO()
-        image.save(buffered, format=format, quality=95)
-        return base64.b64encode(buffered.getvalue()).decode('utf-8')
-        
-    def decode_image(self, base64_str: str) -> Image.Image:
-        """
-        Décode une image à partir d'une chaîne base64.
-        
-        Args:
-            base64_str: Image encodée en base64
-            
-        Returns:
-            Image décodée
-        """
-        return Image.open(BytesIO(base64.b64decode(base64_str)))
-        
-    def save_image(
-        self, 
-        image: Union[Image.Image, str], 
-        output_path: Union[str, Path],
-        format: str = 'PNG',
-        quality: int = 95
-    ) -> Path:
-        """
-        Enregistre une image sur le disque.
-        
-        Args:
-            image: Image à enregistrer (PIL ou base64)
-            output_path: Chemin de sortie
-            format: Format de sortie
-            quality: Qualité de l'image (0-100)
-            
-        Returns:
-            Path: Chemin du fichier enregistré
-        """
-        output_path = self._ensure_output_dir(output_path)
-        
-        if isinstance(image, str):
-            # Si c'est une chaîne base64
-            with open(output_path, 'wb') as f:
-                f.write(base64.b64decode(image))
-        else:
-            # Si c'est une image PIL
-            image.save(output_path, format=format, quality=quality)
-            
-        return output_path
+        self.cache = cache if cache is not None else get_default_cache()
+        self._processed_paths: Set[Path] = (
+            set()
+        )  # Pour éviter les doublons dans un même traitement
 
     def _call_api(
         self,
@@ -209,7 +72,7 @@ class ImageEnhancer:
         Effectue un appel à l'API Stable Diffusion Forge avec mécanisme de réessai.
 
         Args:
-            endpoint: Point de terminaison de l'API (ex: 'sdapi/v1/upscale')
+            endpoint: Point de terminaison de l'API (ex: 'sdapi/v1/txt2img')
             payload: Données à envoyer à l'API
             max_retries: Nombre maximum de tentatives (défaut: 4)
             initial_delay: Délai initial avant la première tentative (en secondes, défaut: 1.0)
@@ -219,184 +82,114 @@ class ImageEnhancer:
 
         Raises:
             URLError: Si toutes les tentatives échouent
+            json.JSONDecodeError: Si la réponse n'est pas du JSON valide
         """
         url = f"{self.api_url}/{endpoint}"
-        headers = {"Content-Type": "application/json"}
+        data = json.dumps(payload).encode("utf-8")
+
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
         last_exception = None
-        delay = initial_delay
 
         for attempt in range(max_retries):
             try:
                 logger.debug(
-                    f"Appel de l'API {endpoint} (tentative {attempt + 1}/{max_retries})"
+                    f"Tentative {attempt + 1}/{max_retries} - Appel de l'API à {url}..."
                 )
                 response = requests.post(
-                    url,
-                    data=json.dumps(payload),
-                    headers=headers,
-                    timeout=self.timeout,
+                    url, data=data, headers=headers, timeout=self.timeout
                 )
                 response.raise_for_status()
                 return response.json()
 
             except requests.exceptions.HTTPError as e:
-                status_code = e.response.status_code if hasattr(e, 'response') else None
-                error_msg = f"Erreur HTTP {status_code} lors de l'appel à {endpoint}"
-                
-                if hasattr(e, "response") and e.response is not None:
+                # Gestion des erreurs HTTP (comme 404, 500, etc.)
+                status_code = getattr(e.response, "status_code", 0)  # 0 pour code inconnu
+                reason = getattr(e.response, "reason", "Raison inconnue")
+
+                # Essayer d'extraire plus de détails de la réponse d'erreur
+                error_details = {}
+                try:
+                    error_response = e.response.json()
+                    if isinstance(error_response, dict):
+                        error_details = {
+                            "detail": error_response.get("detail"),
+                            "validation_error": error_response.get("validation_error"),
+                            "message": error_response.get("message"),
+                        }
+                except (ValueError, AttributeError):
                     try:
-                        error_details = e.response.json()
-                        error_msg += f": {error_details}"
-                    except (ValueError, AttributeError, json.JSONDecodeError):
-                        error_msg += f": {getattr(e.response, 'text', 'Pas de détails')}"
-                else:
-                    error_msg += f": {str(e)}"
+                        error_details = {
+                            "response_text": (
+                                e.response.text[:500] + "..."
+                                if e.response.text
+                                else "Aucun détail supplémentaire"
+                            )
+                        }
+                    except:
+                        error_details = {
+                            "error": "Impossible de récupérer les détails de l'erreur"
+                        }
+
+                error_msg = (
+                    f"Erreur HTTP {status_code} lors de l'appel à {url}: {reason}"
+                )
+                if error_details:
+                    error_msg += f"\nDétails de l'erreur: {json.dumps(error_details, indent=2, ensure_ascii=False)}"
 
                 logger.error(error_msg)
+                last_exception = e
 
-                # Ne pas réessayer pour les erreurs client (4xx) sauf 429 (Too Many Requests)
-                if status_code and 400 <= status_code < 500 and status_code != 429:
+                # Si c'est une erreur 422 (Unprocessable Entity), on arrête les tentatives
+                if status_code == 422:
+                    logger.error(
+                        "Erreur de validation des données. Arrêt des tentatives."
+                    )
                     raise URLError(error_msg) from e
 
+                # Ne pas réessayer pour les erreurs client (4xx) sauf 429 (Too Many Requests)
+                if 400 <= status_code < 500 and status_code != 429:
+                    logger.error(f"Erreur client: {error_msg}")
+                    break
+
                 logger.warning(f"{error_msg} - Tentative {attempt + 1}/{max_retries}")
-                last_exception = e
 
             except (requests.exceptions.RequestException, ConnectionError) as e:
-                error_msg = f"Erreur de connexion lors de l'appel à {endpoint}: {str(e)}"
-                logger.warning(f"{error_msg} - Tentative {attempt + 1}/{max_retries}")
+                # Gestion des erreurs de connexion, timeout, etc.
+                error_msg = f"Erreur de connexion à {url}: {str(e)}"
                 last_exception = e
-
-            # Attendre avant de réessayer avec un délai exponentiel
-            if attempt < max_retries - 1:
-                time.sleep(delay)
-                delay = min(delay * 2, 60)  # Délai maximum de 60 secondes
+                logger.warning(f"{error_msg} - Tentative {attempt + 1}/{max_retries}")
+                # Pour les erreurs 422, on ne réessaie pas car c'est une erreur de validation
+                if not (
+                    hasattr(last_exception, "response")
+                    and getattr(last_exception.response, "status_code", None) == 422
+                ):
+                    # Calculer le délai exponentiel avec un peu d'aléatoire (jitter)
+                    delay = min(
+                        initial_delay * (2**attempt) * (0.8 + 0.4 * random.random()), 60
+                    )  # Maximum 60 secondes
+                    logger.warning(
+                        f"{error_msg} - Nouvelle tentative dans {delay:.1f} secondes..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(
+                        "Erreur de validation des données. Arrêt des tentatives."
+                    )
+                    break
 
         # Si on arrive ici, toutes les tentatives ont échoué
-        error_msg = f"Échec après {max_retries} tentatives"
-        if last_exception:
-            error_msg += f": {str(last_exception)}"
-        raise URLError(error_msg) from last_exception
-        
-    def upscale_image(
-        self,
-        image_path: Union[str, Path],
-        output_path: Optional[Union[str, Path]] = None,
-        scale_factor: int = 2,
-        upscaler: str = "R-ESRGAN_4x+",
-        denoising_strength: float = 0.5,
-        prompt: str = "high quality, high resolution, detailed",
-        negative_prompt: str = "blurry, lowres, low quality, artifacts, jpeg artifacts",
-        steps: int = 20,
-        cfg_scale: float = 7.0,
-        sampler_name: str = "Euler a",
-        output_format: str = "PNG",
-    ) -> Tuple[Path, bool]:
-        """
-        Améliore la résolution d'une image avec Stable Diffusion Forge.
-
-        Args:
-            image_path: Chemin vers l'image source
-            output_path: Chemin de sortie pour l'image améliorée (optionnel)
-            scale_factor: Facteur d'échelle (1-4)
-            upscaler: Nom de l'upscaler à utiliser
-            denoising_strength: Force du débruiteur (0-1)
-            prompt: Prompt pour guider l'amélioration
-            negative_prompt: Éléments à éviter
-            steps: Nombre d'étapes de débruiteur
-            cfg_scale: Échelle de configuration du classificateur
-            sampler_name: Nom de l'échantillonneur à utiliser
-            output_format: Format de sortie de l'image
-
-        Returns:
-            Tuple contenant le chemin de l'image améliorée et un booléen indiquant si l'image a été traitée
-
-        Raises:
-            ValueError: Si les paramètres sont invalides
-            URLError: Si l'appel à l'API échoue
-        """
-        # Validation des paramètres
-        if not 1 <= scale_factor <= 4:
-            raise ValueError("Le facteur d'échelle doit être compris entre 1 et 4")
-            
-        if not 0 <= denoising_strength <= 1:
-            raise ValueError("La force du débruiteur doit être comprise entre 0 et 1")
-            
-        # Validation du chemin d'entrée
-        input_path = self._validate_image_path(image_path)
-        
-        # Génération du chemin de sortie si non spécifié
-        if output_path is None:
-            output_dir = input_path.parent / "enhanced"
-            output_filename = self._generate_output_filename(input_path)
-            output_path = output_dir / output_filename
+        logger.error(f"Échec après {max_retries} tentatives")
+        if isinstance(last_exception, requests.exceptions.HTTPError):
+            status_code = getattr(last_exception.response, "status_code", "inconnu")
+            reason = getattr(last_exception.response, "reason", "Raison inconnue")
+            error_msg = f"Erreur HTTP {status_code} lors de l'appel à {url}: {reason}"
+            raise URLError(error_msg) from last_exception
         else:
-            output_path = Path(output_path).resolve()
-            
-        # Vérification du cache si activé
-        if self.use_cache and self.cache is not None:
-            cache_key = self.cache.generate_key(
-                str(input_path),
-                scale_factor=scale_factor,
-                upscaler=upscaler,
-                denoising_strength=denoising_strength,
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                steps=steps,
-                cfg_scale=cfg_scale,
-                sampler_name=sampler_name,
-            )
-            
-            cached_result = self.cache.get(cache_key)
-            if cached_result is not None and output_path.exists():
-                logger.info(f"Utilisation de l'image en cache: {output_path}")
-                return output_path, True
-        
-        try:
-            # Chargement et prétraitement de l'image
-            with Image.open(input_path) as img:
-                # Prétraitement de l'image
-                processed_img = self.preprocess_image(img)
-                
-                # Encodage de l'image en base64
-                image_b64 = self.encode_image(processed_img)
-                
-                # Préparation de la charge utile pour l'API
-                payload = {
-                    "resize_mode": 0,  # 0 = Just resize (enlarge the image)
-                    "upscaling_resize": scale_factor * 100,  # en pourcentage
-                    "upscaler_1": upscaler,
-                    "image": f"data:image/png;base64,{image_b64}",
-                    "denoising_strength": denoising_strength,
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "steps": steps,
-                    "cfg_scale": cfg_scale,
-                    "sampler_name": sampler_name,
-                }
-                
-                # Appel de l'API d'upscaling
-                response = self._call_api("sdapi/v1/extra-single-image", payload)
-                
-                # Récupération de l'image résultante
-                result_b64 = response.get("images", [None])[0]
-                if not result_b64:
-                    raise ValueError("Aucune image retournée par l'API")
-                
-                # Enregistrement de l'image
-                self.save_image(result_b64, output_path, format=output_format)
-                
-                # Mise en cache si activé
-                if self.use_cache and self.cache is not None:
-                    self.cache.set(cache_key, str(output_path))
-                
-                logger.info(f"Image améliorée enregistrée: {output_path}")
-                return output_path, True
-                
-        except Exception as e:
-            logger.error(f"Erreur lors de l'upscaling de l'image {input_path}: {e}")
-            if isinstance(e, requests.exceptions.RequestException):
-                raise URLError(f"Erreur de connexion à l'API: {e}") from e
-            raise
+            error_msg = f"Impossible de se connecter à l'API à {url} après {max_retries} tentatives"
+            if last_exception:
+                error_msg += f": {str(last_exception)}"
+            raise URLError(error_msg) from last_exception
 
     def preprocess_image(
         self, image_path: Union[str, Path], output_format: str = "PNG"
