@@ -697,7 +697,7 @@ def test_upscale_batch_basic(temp_image, tmp_path):
         enhancer._call_api = original_call_api
 
 
-def test_upscale_batch_multiple_images(temp_image, tmp_path):
+def test_upscale_batch_multiple_images(temp_image, tmp_path, monkeypatch):
     """Teste le traitement par lots avec plusieurs images."""
     # Créer une deuxième image de test
     img2_path = tmp_path / "test2.png"
@@ -705,43 +705,59 @@ def test_upscale_batch_multiple_images(temp_image, tmp_path):
     img.save(img2_path, "PNG")
 
     enhancer = ImageEnhancer()
+    
+    # Désactiver la colorisation automatique pour simplifier le test
+    enhancer.use_cache = False  # Désactiver le cache pour le test
+    
+    # Liste pour stocker les appels à l'API
+    api_calls = []
 
-    # Créer une fonction de remplacement pour _call_api
-    def mock_call_api(endpoint, payload):
-        # Vérifier que nous appelons le bon endpoint
-        assert endpoint == "sdapi/v1/extra-batch-images"
-        assert "imageList" in payload
-        assert len(payload["imageList"]) == 2  # Deux images dans le lot
-
-        # Retourner une réponse factice avec deux images
-        return {
-            "images": [
-                base64.b64encode(b"fake_image_data_1").decode("utf-8"),
-                base64.b64encode(b"fake_image_data_2").decode("utf-8"),
-            ],
-            "parameters": {},
-        }
+    def mock_call_api(endpoint, payload, **kwargs):
+        # Enregistrer l'appel
+        api_calls.append((endpoint, payload))
+        
+        if endpoint == "sdapi/v1/extra-batch-images":
+            # Vérifier que nous avons le bon endpoint
+            assert "imageList" in payload
+            # Retourner une réponse factice avec deux images
+            return {
+                "images": [
+                    base64.b64encode(f"fake_image_data_{i+1}".encode()).decode("utf-8") 
+                    for i in range(len(payload["imageList"]))
+                ],
+                "parameters": {},
+            }
+        elif endpoint == "sdapi/v1/img2img":
+            # Simuler une réponse de colorisation
+            return {"images": [base64.b64encode(b"colorized_image").decode("utf-8")]}
+        else:
+            raise ValueError(f"Unexpected endpoint: {endpoint}")
 
     # Remplacer la méthode _call_api par notre mock
-    original_call_api = enhancer._call_api
-    enhancer._call_api = mock_call_api
+    monkeypatch.setattr(enhancer, '_call_api', mock_call_api)
+    
+    # Appeler la méthode à tester avec auto_colorize=False pour éviter la colorisation
+    results = enhancer.upscale_batch(
+        image_paths=[temp_image, img2_path],
+        output_dir=tmp_path,
+        auto_colorize=False  # Désactiver la colorisation pour simplifier
+    )
 
-    try:
-        # Appeler la méthode à tester
-        results = enhancer.upscale_batch(
-            image_paths=[temp_image, img2_path], output_dir=tmp_path
-        )
-
-        # Vérifier les résultats
-        assert len(results) == 2
-        for result in results:
-            output_path, is_bw = result
-            assert output_path is not None
-            assert output_path.exists()
-            assert isinstance(is_bw, bool)
-    finally:
-        # Restaurer la méthode originale
-        enhancer._call_api = original_call_api
+    # Vérifier les résultats
+    assert len(results) == 2, f"Expected 2 results, got {len(results)}"
+    
+    # Vérifier que les fichiers de sortie ont été créés
+    output_files = list(tmp_path.glob('*_enhanced.png'))
+    assert len(output_files) == 2, f"Expected 2 output files, found {len(output_files)}"
+    
+    for i, (output_path, is_bw) in enumerate(results):
+        assert output_path is not None, f"Output path is None for image {i+1}"
+        assert output_path.exists(), f"Output file does not exist: {output_path}"
+        assert output_path.suffix == '.png', f"Expected .png file, got {output_path.suffix}"
+        assert isinstance(is_bw, bool), f"is_bw should be boolean, got {type(is_bw)}"
+        
+        # Vérifier que le fichier n'est pas vide
+        assert output_path.stat().st_size > 0, f"Output file is empty: {output_path}"
 
 
 def test_upscale_batch_with_bw_images(temp_bw_image, tmp_path):

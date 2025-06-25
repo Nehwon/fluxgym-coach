@@ -9,6 +9,8 @@ import json
 import logging
 import os
 import random
+import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, cast, Set
 from urllib.error import URLError
@@ -100,7 +102,7 @@ class ImageEnhancer:
 
             except requests.exceptions.HTTPError as e:
                 # Gestion des erreurs HTTP (comme 404, 500, etc.)
-                status_code = getattr(e.response, "status_code", "inconnu")
+                status_code = getattr(e.response, "status_code", 0)  # 0 pour code inconnu
                 reason = getattr(e.response, "reason", "Raison inconnue")
 
                 # Essayer d'extraire plus de détails de la réponse d'erreur
@@ -480,10 +482,16 @@ class ImageEnhancer:
 
             # Vérifier le cache si activé
             if self.use_cache and not skip_cache and self.cache:
-                if self.cache.is_cached(image_path, output_path, params):
+                is_cached, cached_output = self.cache.is_cached(
+                    source_path=image_path,
+                    output_path=output_path,
+                    params=params,
+                    return_cached_path=True
+                )
+                if is_cached and cached_output:
                     logger.info(f"Image en cache, saut du traitement: {image_path}")
                     self._processed_paths.add(image_path)
-                    return Path(output_path) if output_path else None, False, None
+                    return cached_output, False, None
 
             # Prétraiter l'image
             output_format = params.get("output_format", "PNG")
@@ -610,51 +618,161 @@ class ImageEnhancer:
             sampler_name=sampler_name,
         )
 
-        # Initialiser la liste des résultats avec des valeurs par défaut
-        results = [(None, False)] * len(image_paths)
+        # Initialiser la liste des résultats avec des valeurs par défaut (None, False)
+        results: List[Tuple[Optional[Path], bool]] = [(None, False)] * len(image_paths)
 
         # Liste pour stocker les images à traiter
-        images_to_process = []
+        images_to_process: List[Dict[str, Any]] = []
 
-        # Vérifier le cache pour chaque image
+        # Parcourir toutes les images pour le prétraitement et la vérification du cache
         for idx, img_path in enumerate(image_paths):
-            try:
-                img_path = Path(img_path).resolve()
+            img_path = Path(img_path).resolve()
+            if not img_path.exists():
+                logger.error(f"Le fichier source n'existe pas: {img_path}")
+                continue
 
-                # Vérifier si l'image a déjà été traitée dans cette session
-                if str(img_path) in self._processed_paths and not force_reprocess:
-                    logger.debug(f"Image déjà traitée dans cette session: {img_path}")
+            # Vérifier si cette image a déjà été traitée dans cette session
+            if str(img_path) in self._processed_paths and not force_reprocess:
+                logger.debug(f"[BATCH] Image déjà traitée dans cette session: {img_path}")
+                # Si l'image a déjà été traitée, on récupère son résultat du cache
+                if self.use_cache and self.cache and not skip_cache:
+                    output_path = self._get_output_path(img_path, output_dir, output_format)
+                    logger.debug(f"[BATCH] Chemin de sortie généré: {output_path}")
+                    
+                    is_cached_result, cached_output = self.cache.is_cached(
+                        source_path=img_path,
+                        output_path=output_path,
+                        params=cache_params,
+                        return_cached_path=True
+                    )
+                    logger.debug(f"[BATCH] Résultat du cache: is_cached={is_cached_result}, cached_output={cached_output}")
+                    
+                    if is_cached_result and cached_output and cached_output.exists():
+                        results[idx] = (cached_output, False)
+                        logger.debug(f"[BATCH] Résultat en cache trouvé pour l'index {idx}: {cached_output}")
+                        # Passer à l'image suivante
+                        continue
+                    else:
+                        logger.debug(f"[BATCH] Aucun résultat en cache valide pour l'index {idx}, traitement nécessaire")
+                else:
+                    logger.debug("[BATCH] Cache désactivé ou non disponible pour cette image")
+                
+                # Si on arrive ici, c'est que le cache n'est pas disponible ou que l'image n'est pas en cache
+                # On continue le traitement normalement
+                logger.debug(f"[BATCH] Traitement de l'image {idx} malgré le cache")
+                # Ne pas utiliser 'continue' ici pour permettre le traitement de l'image
+
+            # Vérifier le cache pour cette image
+            if self.use_cache and self.cache and not skip_cache:
+                output_path = self._get_output_path(img_path, output_dir, output_format)
+                logger.debug(f"[BATCH] Vérification du cache pour l'image {idx} ({img_path.name})")
+                
+                is_cached_result, cached_output = self.cache.is_cached(
+                    source_path=img_path,
+                    output_path=output_path,
+                    params=cache_params,
+                    return_cached_path=True
+                )
+                logger.debug(f"[BATCH] Résultat du cache: is_cached={is_cached_result}, cached_output={cached_output}")
+                
+                if is_cached_result and cached_output and cached_output.exists():
+                    results[idx] = (cached_output, False)
+                    logger.debug(f"[BATCH] Résultat en cache trouvé pour l'index {idx}: {cached_output}")
+                    continue  # Passer à l'image suivante
+                
+                logger.debug(f"[BATCH] Aucun résultat en cache valide pour l'index {idx}, traitement nécessaire")
+            else:
+                logger.debug("[BATCH] Cache désactivé ou non disponible pour cette image")
+            
+            # Déterminer le chemin de sortie
+            output_path = self._get_output_path(img_path, output_dir, output_format)
+            logger.debug(f"[BATCH] Chemin de sortie final: {output_path}")
+            
+            if not output_path:
+                logger.error(f"[BATCH] Impossible de déterminer le chemin de sortie pour l'image {idx}: {img_path}")
+                results[idx] = (None, False)
+                continue  # Passer à l'image suivante
+
+            # Vérifier le cache si nécessaire
+            if self.use_cache and not skip_cache and self.cache and not force_reprocess:
+                logger.debug(f"[BATCH] Vérification du cache pour l'image {idx} ({img_path.name})")
+
+                is_cached, cached_output = self.cache.is_cached(
+                    source_path=img_path,
+                    output_path=output_path,
+                    params=cache_params,
+                    return_cached_path=True
+                )
+
+                if is_cached and cached_output:
+                    logger.info(
+                        f"[BATCH] Image {idx} ({img_path.name}) en cache, saut du traitement: {img_path} -> {output_path}"
+                    )
+                    self._processed_paths.add(str(img_path))
+                    # Vérifier que le fichier de sortie existe
+                    if cached_output.exists():
+                        results[idx] = (cached_output, False)
+                        logger.debug(f"[BATCH] Fichier de sortie en cache trouvé: {cached_output}")
+                        continue  # Passer à l'image suivante
+                    else:
+                        logger.warning(f"[BATCH] Fichier de sortie en cache manquant: {cached_output}")
+                        # Continuer le traitement normalement
+
+            # Ajouter à la liste des images à traiter
+            try:
+                # S'assurer que le chemin de sortie est défini
+                if not output_path:
+                    output_path = self._get_output_path(img_path, output_dir, output_format)
+                    logger.debug(f"[BATCH] Chemin de sortie généré: {output_path}")
+                
+                # S'assurer que le répertoire parent existe
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Vérifier si le fichier de sortie existe déjà pour éviter les doublons
+                if output_path.exists() and not force_reprocess:
+                    logger.debug(f"[BATCH] Le fichier de sortie existe déjà: {output_path}")
+                    results[idx] = (output_path, False)
+                    continue
+                
+                # Ajouter à la liste de traitement
+                images_to_process.append(
+                    {
+                        "original_index": idx,  # Utilisation cohérente de original_index
+                        "path": img_path,
+                        "output_path": output_path,
+                        "params": cache_params,
+                        "image": None,  # Ajout pour cohérence de structure
+                        "is_bw": False    # Valeur par défaut
+                    }
+                )
+                logger.debug(f"[BATCH] Image {idx} ajoutée à la file de traitement: {img_path.name} -> {output_path}")
+                
+            except Exception as e:
+                logger.error(f"[BATCH] Erreur lors de la préparation du répertoire de sortie pour {img_path}: {e}")
+                results[idx] = (None, False)
+                continue  # Passer à l'image suivante
+                
+            # Ajouter l'image au cache si elle existe déjà
+            if output_path and output_path.exists():
+                if self.use_cache and self.cache:
+                    try:
+                        self.cache.add_to_cache(img_path, output_path, cache_params)
+                        logger.debug(f"[BATCH] Image ajoutée au cache: {output_path}")
+                        # Mettre à jour les résultats à l'index actuel
+                        results[idx] = (output_path, False)
+                        logger.debug(f"Résultat mis en cache pour l'index {idx}: {output_path}")
+                        continue
+                    except Exception as e:
+                        logger.error(f"[BATCH] Erreur lors de l'ajout au cache: {e}")
+                else:
+                    logger.warning(
+                        f"Le fichier de sortie en cache n'existe pas: {output_path}"
+                    )
+                    # Essayer de traiter l'image normalement
                     continue
 
-                # Générer le chemin de sortie
-                output_path = self._get_output_path(img_path, output_dir, output_format)
-
-                # Vérifier le cache
-                if (
-                    self.use_cache
-                    and not skip_cache
-                    and self.cache
-                    and not force_reprocess
-                ):
-                    logger.debug(
-                        f"Vérification du cache pour l'image {idx} ({img_path.name})"
-                    )
-
-                    is_cached = self.cache.is_cached(
-                        img_path, output_path, cache_params
-                    )
-
-                    if is_cached:
-                        logger.info(
-                            f"Image {idx} ({img_path.name}) en cache, saut du traitement: {img_path} -> {output_path}"
-                        )
-                        self._processed_paths.add(str(img_path))
-                        results[idx] = (
-                            str(output_path),
-                            False,
-                        )  # S'assurer que le chemin est une chaîne
-                        continue
-
+            # Traiter l'image normalement
+            try:
                 # Prétraiter l'image
                 processed_img, is_bw = self.preprocess_image(img_path, output_format)
 
@@ -671,7 +789,7 @@ class ImageEnhancer:
                         )
 
                         logger.info(
-                            f"Colorisation de l'image {img_path.name} détectée en N/B"
+                            f"[BATCH] Colorisation de l'image {img_path.name} détectée en N/B"
                         )
                         processed_img = self.colorize_image(
                             image=processed_img,
@@ -684,7 +802,7 @@ class ImageEnhancer:
                         is_bw = False
                     except Exception as colorize_error:
                         logger.warning(
-                            f"Échec de la colorisation de l'image {img_path.name}: {colorize_error}"
+                            f"[BATCH] Échec de la colorisation de l'image {img_path.name}: {colorize_error}"
                         )
                         if (
                             "black and white" not in prompt.lower()
@@ -738,8 +856,9 @@ class ImageEnhancer:
         # Préparer la liste des images au format attendu par l'API
         image_list = []
         for i, img in enumerate(images_to_process):
-            if img["image"] is not None:
-                # Convertir l'image en base64 sans l'en-tête data:image/...
+            # Vérifier si l'élément contient une image encodée
+            if "image" in img and img["image"] is not None:
+                # Convertir l'image en base64 sans l'en-tête data:image/
                 if isinstance(img["image"], str) and img["image"].startswith(
                     "data:image/"
                 ):
@@ -756,6 +875,9 @@ class ImageEnhancer:
                 image_list.append(
                     {"data": base64_data, "name": f"image_{i}.{output_format.lower()}"}
                 )
+            else:
+                # Si pas d'image dans ce dictionnaire, passer à l'élément suivant
+                continue
 
         # Appel à l'API avec gestion d'erreur améliorée
         try:
@@ -804,33 +926,81 @@ class ImageEnhancer:
             for i, (img_data, img_info) in enumerate(
                 zip(response["images"], images_to_process)
             ):
-                if img_data and img_info["output_path"]:
+                logger.debug(f"[BATCH] Traitement du résultat {i+1}/{len(images_to_process)}")
+                logger.debug(f"[BATCH] Image info: {img_info}")
+                logger.debug(f"[BATCH] Image data: {'Présente' if img_data else 'Manquante'}")
+                logger.debug(f"[BATCH] Output path: {img_info.get('output_path')}")
+                
+                if not img_data:
+                    logger.warning(f"[BATCH] Aucune donnée d'image reçue pour l'index {i}")
+                    continue
+                    
+                if not img_info.get("output_path"):
+                    logger.warning(f"[BATCH] Pas de chemin de sortie pour l'index {i}, tentative de génération...")
+                    # Essayer de générer un chemin de sortie
                     try:
-                        output_path = img_info["output_path"]
-                        self.decode_and_save_base64(
-                            img_data, output_path, overwrite=True
+                        img_info["output_path"] = self._get_output_path(
+                            img_info["path"], 
+                            output_dir, 
+                            output_format
                         )
-
-                        # Mettre à jour le cache
-                        if self.use_cache and not skip_cache and self.cache:
-                            self.cache.add_to_cache(
-                                img_info["path"], output_path, cache_params
-                            )
-
-                        # Mettre à jour les résultats à l'index d'origine
-                        original_idx = img_info["original_index"]
-                        results[original_idx] = (output_path, img_info["is_bw"])
-                        self._processed_paths.add(str(img_info["path"]))
-                        logger.debug(
-                            f"Image {i+1}/{len(images_to_process)} (index original: {original_idx}) sauvegardée: {output_path}"
-                        )
+                        logger.info(f"[BATCH] Chemin de sortie généré: {img_info['output_path']}")
                     except Exception as e:
-                        original_idx = img_info["original_index"]
-                        logger.error(
-                            f"Erreur lors de la sauvegarde de l'image {output_path} (index {original_idx}): {e}"
+                        logger.error(f"[BATCH] Impossible de générer un chemin de sortie: {e}")
+                    # Vérifier que nous avons des données d'image
+                if not img_data:
+                    logger.warning(f"Aucune donnée d'image reçue pour l'index {i}")
+                    continue
+                    
+                # S'assurer que nous avons un chemin de sortie
+                if not img_info.get("output_path"):
+                    try:
+                        img_info["output_path"] = self._get_output_path(
+                            img_info["path"], 
+                            output_dir, 
+                            output_format
                         )
-                        # Garder la valeur par défaut (None, False) pour cette image
+                        logger.info(f"Chemin de sortie généré: {img_info['output_path']}")
+                    except Exception as e:
+                        logger.error(f"Impossible de générer un chemin de sortie: {e}")
+                        if "original_index" in img_info:
+                            results[img_info["original_index"]] = (None, False)
                         continue
+                        
+                # Traiter et sauvegarder l'image
+                try:
+                    output_path = Path(img_info["output_path"])
+                    # Créer le répertoire parent s'il n'existe pas
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    self.decode_and_save_base64(
+                        img_data, output_path, overwrite=True
+                    )
+
+                    # Mettre à jour le cache
+                    if self.use_cache and not skip_cache and self.cache:
+                        self.cache.add_to_cache(
+                            img_info["path"], output_path, cache_params
+                        )
+
+                    # Mettre à jour les résultats à l'index d'origine
+                    original_idx = img_info["original_index"]
+                    results[original_idx] = (output_path, img_info["is_bw"])
+                    self._processed_paths.add(str(img_info["path"]))
+                    logger.debug(
+                        f"Image {i+1}/{len(images_to_process)} (index original: {original_idx}) sauvegardée: {output_path}"
+                    )
+                except Exception as e:
+                    original_idx = img_info.get("original_index", i)
+                    output_path = img_info.get("output_path", "inconnu")
+                    logger.error(
+                        f"Erreur lors de la sauvegarde de l'image {output_path} (index {original_idx}): {e}",
+                        exc_info=True
+                    )
+                    # Mettre à jour le résultat avec None pour cet index
+                    if "original_index" in img_info:
+                        results[img_info["original_index"]] = (None, False)
+                    continue
 
             return results
 
@@ -1159,10 +1329,9 @@ def enhance_image(
         )
     else:
         # Traitement d'une seule image
-        result = enhancer.upscale_image(
+        return enhancer.upscale_image(
             image_path=image_path, output_path=output_path, **kwargs
         )
-        return result[0]  # Retourne uniquement le chemin pour la rétrocompatibilité
 
 
 def main():
